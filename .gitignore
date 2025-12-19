@@ -1,3 +1,9 @@
 /KIRA_REFERENCE
 .DS_Store
 
+**/node_modules
+**/tanstack
+**/dist-electron
+**/dist-react
+**/release
+**/build

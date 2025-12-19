@@ -1,0 +1,19 @@
+{
+  "appId": "com.kakaoent.enttokk-e",
+  "productName": "Enttokk-E",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": ["dist-react/**/*", "dist-electron/**/*"],
+  "mac": {
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.productivity"
+  },
+  "win": {
+    "target": ["nsis", "portable"]
+  },
+  "linux": {
+    "target": ["AppImage", "deb"]
+  }
+}
