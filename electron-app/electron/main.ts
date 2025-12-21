@@ -1,6 +1,16 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  readFile,
+  writeFile,
+  showOpenDialog,
+  showSaveDialog,
+  showSelectFolderDialog,
+  listMarkdownFiles,
+  createNote,
+  getNotePath,
+} from "./file-handlers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,3 +53,25 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+
+// IPC Handlers for file operations
+ipcMain.handle("file:read", (_, filePath: string) => readFile(filePath));
+ipcMain.handle("file:write", (_, filePath: string, content: string) =>
+  writeFile(filePath, content)
+);
+ipcMain.handle("file:open-dialog", () => showOpenDialog());
+ipcMain.handle("file:save-dialog", (_, defaultPath?: string) =>
+  showSaveDialog(defaultPath)
+);
+
+// IPC Handlers for vault/notes operations
+ipcMain.handle("vault:select-folder", () => showSelectFolderDialog());
+ipcMain.handle("vault:list-notes", (_, folderPath: string) =>
+  listMarkdownFiles(folderPath)
+);
+ipcMain.handle("vault:create-note", (_, folderPath: string, title: string) =>
+  createNote(folderPath, title)
+);
+ipcMain.handle("vault:get-note-path", (_, folderPath: string, noteId: string) =>
+  getNotePath(folderPath, noteId)
+);
