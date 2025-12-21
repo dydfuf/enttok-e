@@ -1,12 +1,41 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_app/notes/")({
   component: NotesIndexPage,
 });
 
 function NotesIndexPage() {
+  const [open, setOpen] = useState(false);
+  const [noteTitle, setNoteTitle] = useState("");
+
   // TODO: Load notes from vault
   const notes: { id: string; title: string; updatedAt: string }[] = [];
+
+  const handleCreateNote = () => {
+    if (!noteTitle.trim()) {
+      toast.error("Please enter a note title");
+      return;
+    }
+    // TODO: Actually create the note
+    toast.success(`Note "${noteTitle}" created!`);
+    setNoteTitle("");
+    setOpen(false);
+  };
 
   return (
     <div className="h-full p-6">
@@ -15,9 +44,45 @@ function NotesIndexPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             Notes
           </h1>
-          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-            New Note
-          </button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4" />
+                New Note
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Note</DialogTitle>
+                <DialogDescription>
+                  Enter a title for your new note. You can add content after
+                  creating it.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Label htmlFor="title" className="mb-2">
+                  Title
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="My new note..."
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleCreateNote();
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateNote}>Create</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {notes.length === 0 ? (

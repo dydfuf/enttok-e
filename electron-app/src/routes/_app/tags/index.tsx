@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_app/tags/")({
   component: TagsIndexPage,
@@ -26,14 +27,11 @@ function TagsIndexPage() {
         ) : (
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (
-              <Link
-                key={tag.name}
-                to="/tags/$tag"
-                params={{ tag: tag.name }}
-                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                #{tag.name}
-                <span className="ml-1 text-gray-500">({tag.count})</span>
+              <Link key={tag.name} to="/tags/$tag" params={{ tag: tag.name }}>
+                <Badge variant="secondary" className="text-sm py-1.5 px-3">
+                  #{tag.name}
+                  <span className="ml-1 opacity-60">({tag.count})</span>
+                </Badge>
               </Link>
             ))}
           </div>
