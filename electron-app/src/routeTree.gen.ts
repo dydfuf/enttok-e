@@ -9,38 +9,207 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppTagsRouteImport } from './routes/_app/tags'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSearchRouteImport } from './routes/_app/search'
+import { Route as AppNotesRouteImport } from './routes/_app/notes'
+import { Route as AppIntegrationsRouteImport } from './routes/_app/integrations'
+import { Route as AppDailyRouteImport } from './routes/_app/daily'
+import { Route as AppTagsIndexRouteImport } from './routes/_app/tags/index'
+import { Route as AppNotesIndexRouteImport } from './routes/_app/notes/index'
+import { Route as AppIntegrationsIndexRouteImport } from './routes/_app/integrations/index'
+import { Route as AppTagsTagRouteImport } from './routes/_app/tags/$tag'
+import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes/$noteId'
+import { Route as AppIntegrationsGithubRouteImport } from './routes/_app/integrations/github'
+import { Route as AppDailyDateRouteImport } from './routes/_app/daily.$date'
 
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTagsRoute = AppTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSearchRoute = AppSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotesRoute = AppNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDailyRoute = AppDailyRouteImport.update({
+  id: '/daily',
+  path: '/daily',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTagsIndexRoute = AppTagsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppTagsRoute,
+} as any)
+const AppNotesIndexRoute = AppNotesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppNotesRoute,
+} as any)
+const AppIntegrationsIndexRoute = AppIntegrationsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppIntegrationsRoute,
+} as any)
+const AppTagsTagRoute = AppTagsTagRouteImport.update({
+  id: '/$tag',
+  path: '/$tag',
+  getParentRoute: () => AppTagsRoute,
+} as any)
+const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
+  id: '/$noteId',
+  path: '/$noteId',
+  getParentRoute: () => AppNotesRoute,
+} as any)
+const AppIntegrationsGithubRoute = AppIntegrationsGithubRouteImport.update({
+  id: '/github',
+  path: '/github',
+  getParentRoute: () => AppIntegrationsRoute,
+} as any)
+const AppDailyDateRoute = AppDailyDateRouteImport.update({
+  id: '/$date',
+  path: '/$date',
+  getParentRoute: () => AppDailyRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/daily': typeof AppDailyRouteWithChildren
+  '/integrations': typeof AppIntegrationsRouteWithChildren
+  '/notes': typeof AppNotesRouteWithChildren
+  '/search': typeof AppSearchRoute
+  '/settings': typeof AppSettingsRoute
+  '/tags': typeof AppTagsRouteWithChildren
+  '/daily/$date': typeof AppDailyDateRoute
+  '/integrations/github': typeof AppIntegrationsGithubRoute
+  '/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/tags/$tag': typeof AppTagsTagRoute
+  '/integrations/': typeof AppIntegrationsIndexRoute
+  '/notes/': typeof AppNotesIndexRoute
+  '/tags/': typeof AppTagsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/daily': typeof AppDailyRouteWithChildren
+  '/search': typeof AppSearchRoute
+  '/settings': typeof AppSettingsRoute
+  '/daily/$date': typeof AppDailyDateRoute
+  '/integrations/github': typeof AppIntegrationsGithubRoute
+  '/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/tags/$tag': typeof AppTagsTagRoute
+  '/integrations': typeof AppIntegrationsIndexRoute
+  '/notes': typeof AppNotesIndexRoute
+  '/tags': typeof AppTagsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/daily': typeof AppDailyRouteWithChildren
+  '/_app/integrations': typeof AppIntegrationsRouteWithChildren
+  '/_app/notes': typeof AppNotesRouteWithChildren
+  '/_app/search': typeof AppSearchRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/tags': typeof AppTagsRouteWithChildren
+  '/_app/daily/$date': typeof AppDailyDateRoute
+  '/_app/integrations/github': typeof AppIntegrationsGithubRoute
+  '/_app/notes/$noteId': typeof AppNotesNoteIdRoute
+  '/_app/tags/$tag': typeof AppTagsTagRoute
+  '/_app/integrations/': typeof AppIntegrationsIndexRoute
+  '/_app/notes/': typeof AppNotesIndexRoute
+  '/_app/tags/': typeof AppTagsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/daily'
+    | '/integrations'
+    | '/notes'
+    | '/search'
+    | '/settings'
+    | '/tags'
+    | '/daily/$date'
+    | '/integrations/github'
+    | '/notes/$noteId'
+    | '/tags/$tag'
+    | '/integrations/'
+    | '/notes/'
+    | '/tags/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/daily'
+    | '/search'
+    | '/settings'
+    | '/daily/$date'
+    | '/integrations/github'
+    | '/notes/$noteId'
+    | '/tags/$tag'
+    | '/integrations'
+    | '/notes'
+    | '/tags'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/daily'
+    | '/_app/integrations'
+    | '/_app/notes'
+    | '/_app/search'
+    | '/_app/settings'
+    | '/_app/tags'
+    | '/_app/daily/$date'
+    | '/_app/integrations/github'
+    | '/_app/notes/$noteId'
+    | '/_app/tags/$tag'
+    | '/_app/integrations/'
+    | '/_app/notes/'
+    | '/_app/tags/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +217,176 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/tags': {
+      id: '/_app/tags'
+      path: '/tags'
+      fullPath: '/tags'
+      preLoaderRoute: typeof AppTagsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/search': {
+      id: '/_app/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AppSearchRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/notes': {
+      id: '/_app/notes'
+      path: '/notes'
+      fullPath: '/notes'
+      preLoaderRoute: typeof AppNotesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/integrations': {
+      id: '/_app/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AppIntegrationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/daily': {
+      id: '/_app/daily'
+      path: '/daily'
+      fullPath: '/daily'
+      preLoaderRoute: typeof AppDailyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tags/': {
+      id: '/_app/tags/'
+      path: '/'
+      fullPath: '/tags/'
+      preLoaderRoute: typeof AppTagsIndexRouteImport
+      parentRoute: typeof AppTagsRoute
+    }
+    '/_app/notes/': {
+      id: '/_app/notes/'
+      path: '/'
+      fullPath: '/notes/'
+      preLoaderRoute: typeof AppNotesIndexRouteImport
+      parentRoute: typeof AppNotesRoute
+    }
+    '/_app/integrations/': {
+      id: '/_app/integrations/'
+      path: '/'
+      fullPath: '/integrations/'
+      preLoaderRoute: typeof AppIntegrationsIndexRouteImport
+      parentRoute: typeof AppIntegrationsRoute
+    }
+    '/_app/tags/$tag': {
+      id: '/_app/tags/$tag'
+      path: '/$tag'
+      fullPath: '/tags/$tag'
+      preLoaderRoute: typeof AppTagsTagRouteImport
+      parentRoute: typeof AppTagsRoute
+    }
+    '/_app/notes/$noteId': {
+      id: '/_app/notes/$noteId'
+      path: '/$noteId'
+      fullPath: '/notes/$noteId'
+      preLoaderRoute: typeof AppNotesNoteIdRouteImport
+      parentRoute: typeof AppNotesRoute
+    }
+    '/_app/integrations/github': {
+      id: '/_app/integrations/github'
+      path: '/github'
+      fullPath: '/integrations/github'
+      preLoaderRoute: typeof AppIntegrationsGithubRouteImport
+      parentRoute: typeof AppIntegrationsRoute
+    }
+    '/_app/daily/$date': {
+      id: '/_app/daily/$date'
+      path: '/$date'
+      fullPath: '/daily/$date'
+      preLoaderRoute: typeof AppDailyDateRouteImport
+      parentRoute: typeof AppDailyRoute
+    }
   }
 }
 
+interface AppDailyRouteChildren {
+  AppDailyDateRoute: typeof AppDailyDateRoute
+}
+
+const AppDailyRouteChildren: AppDailyRouteChildren = {
+  AppDailyDateRoute: AppDailyDateRoute,
+}
+
+const AppDailyRouteWithChildren = AppDailyRoute._addFileChildren(
+  AppDailyRouteChildren,
+)
+
+interface AppIntegrationsRouteChildren {
+  AppIntegrationsGithubRoute: typeof AppIntegrationsGithubRoute
+  AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
+}
+
+const AppIntegrationsRouteChildren: AppIntegrationsRouteChildren = {
+  AppIntegrationsGithubRoute: AppIntegrationsGithubRoute,
+  AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,
+}
+
+const AppIntegrationsRouteWithChildren = AppIntegrationsRoute._addFileChildren(
+  AppIntegrationsRouteChildren,
+)
+
+interface AppNotesRouteChildren {
+  AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
+  AppNotesIndexRoute: typeof AppNotesIndexRoute
+}
+
+const AppNotesRouteChildren: AppNotesRouteChildren = {
+  AppNotesNoteIdRoute: AppNotesNoteIdRoute,
+  AppNotesIndexRoute: AppNotesIndexRoute,
+}
+
+const AppNotesRouteWithChildren = AppNotesRoute._addFileChildren(
+  AppNotesRouteChildren,
+)
+
+interface AppTagsRouteChildren {
+  AppTagsTagRoute: typeof AppTagsTagRoute
+  AppTagsIndexRoute: typeof AppTagsIndexRoute
+}
+
+const AppTagsRouteChildren: AppTagsRouteChildren = {
+  AppTagsTagRoute: AppTagsTagRoute,
+  AppTagsIndexRoute: AppTagsIndexRoute,
+}
+
+const AppTagsRouteWithChildren =
+  AppTagsRoute._addFileChildren(AppTagsRouteChildren)
+
+interface AppRouteChildren {
+  AppDailyRoute: typeof AppDailyRouteWithChildren
+  AppIntegrationsRoute: typeof AppIntegrationsRouteWithChildren
+  AppNotesRoute: typeof AppNotesRouteWithChildren
+  AppSearchRoute: typeof AppSearchRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppTagsRoute: typeof AppTagsRouteWithChildren
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppDailyRoute: AppDailyRouteWithChildren,
+  AppIntegrationsRoute: AppIntegrationsRouteWithChildren,
+  AppNotesRoute: AppNotesRouteWithChildren,
+  AppSearchRoute: AppSearchRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppTagsRoute: AppTagsRouteWithChildren,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
