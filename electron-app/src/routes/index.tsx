@@ -1,4 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { FolderOpen, Trash2, Loader2 } from "lucide-react";
+import { useVault } from "@/contexts/VaultContext";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   component: VaultSelectPage,
@@ -6,16 +10,51 @@ export const Route = createFileRoute("/")({
 
 function VaultSelectPage() {
   const navigate = useNavigate();
+  const {
+    vaultPath,
+    recentVaults,
+    isLoading,
+    isInitialized,
+    selectVault,
+    openVault,
+    removeRecentVault,
+  } = useVault();
 
-  const handleOpenVault = () => {
-    // TODO: Implement vault selection via IPC
-    navigate({ to: "/daily" });
+  useEffect(() => {
+    if (isInitialized && vaultPath) {
+      navigate({ to: "/daily" });
+    }
+  }, [isInitialized, vaultPath, navigate]);
+
+  const handleOpenVault = async () => {
+    const success = await selectVault();
+    if (success) {
+      navigate({ to: "/daily" });
+    }
   };
 
-  const handleCreateVault = () => {
-    // TODO: Implement vault creation via IPC
-    navigate({ to: "/daily" });
+  const handleSelectRecentVault = async (path: string) => {
+    const success = await openVault(path);
+    if (success) {
+      navigate({ to: "/daily" });
+    }
   };
+
+  const handleRemoveRecentVault = async (
+    e: React.MouseEvent,
+    path: string
+  ) => {
+    e.stopPropagation();
+    await removeRecentVault(path);
+  };
+
+  if (!isInitialized || isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -30,28 +69,61 @@ function VaultSelectPage() {
         </div>
 
         <div className="space-y-4">
-          <button
+          <Button
             onClick={handleOpenVault}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="w-full py-6"
+            size="lg"
           >
+            <FolderOpen className="h-5 w-5 mr-2" />
             Open Vault
-          </button>
-          <button
-            onClick={handleCreateVault}
-            className="w-full py-3 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium rounded-lg transition-colors"
-          >
-            Create New Vault
-          </button>
+          </Button>
         </div>
 
-        <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
-            Recent Vaults
-          </h3>
-          <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-            No recent vaults
+        {recentVaults.length > 0 && (
+          <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+              Recent Vaults
+            </h3>
+            <ul className="space-y-2">
+              {recentVaults.map((vault) => (
+                <li key={vault.path}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectRecentVault(vault.path)}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {vault.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {vault.path}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemoveRecentVault(e, vault.path)}
+                      className="ml-2 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        )}
+
+        {recentVaults.length === 0 && (
+          <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+              Recent Vaults
+            </h3>
+            <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+              No recent vaults
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -34,4 +34,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("daily:create", vaultPath, date),
   listDailyNoteDates: (vaultPath: string) =>
     ipcRenderer.invoke("daily:list-dates", vaultPath),
+
+  // Vault Store API
+  getCurrentVault: () => ipcRenderer.invoke("store:get-current-vault"),
+  setCurrentVault: (vaultPath: string) =>
+    ipcRenderer.invoke("store:set-current-vault", vaultPath),
+  clearCurrentVault: () => ipcRenderer.invoke("store:clear-current-vault"),
+  getRecentVaults: () => ipcRenderer.invoke("store:get-recent-vaults"),
+  removeRecentVault: (vaultPath: string) =>
+    ipcRenderer.invoke("store:remove-recent-vault", vaultPath),
 });

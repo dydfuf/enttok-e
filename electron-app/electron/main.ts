@@ -14,6 +14,13 @@ import {
   createDailyNote,
   listDailyNoteDates,
 } from "./file-handlers.js";
+import {
+  getCurrentVaultPath,
+  setCurrentVaultPath,
+  clearCurrentVaultPath,
+  getRecentVaults,
+  removeFromRecentVaults,
+} from "./store.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,3 +96,19 @@ ipcMain.handle("daily:create", (_, vaultPath: string, date: string) =>
 ipcMain.handle("daily:list-dates", (_, vaultPath: string) =>
   listDailyNoteDates(vaultPath)
 );
+
+// IPC Handlers for vault store
+ipcMain.handle("store:get-current-vault", () => getCurrentVaultPath());
+ipcMain.handle("store:set-current-vault", (_, vaultPath: string) => {
+  setCurrentVaultPath(vaultPath);
+  return { success: true };
+});
+ipcMain.handle("store:clear-current-vault", () => {
+  clearCurrentVaultPath();
+  return { success: true };
+});
+ipcMain.handle("store:get-recent-vaults", () => getRecentVaults());
+ipcMain.handle("store:remove-recent-vault", (_, vaultPath: string) => {
+  removeFromRecentVaults(vaultPath);
+  return { success: true };
+});

@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Plus, FolderOpen, RefreshCw } from "lucide-react";
 import { useNotes } from "@/hooks/useNotes";
+import { useVault } from "@/contexts/VaultContext";
 import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_app/notes/")({
@@ -26,15 +27,9 @@ function NotesIndexPage() {
   const [open, setOpen] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
 
-  const {
-    vaultPath,
-    notes,
-    isLoading,
-    error,
-    selectVault,
-    loadNotes,
-    createNote,
-  } = useNotes();
+  const { selectVault } = useVault();
+  const { vaultPath, notes, isLoading, error, loadNotes, createNote } =
+    useNotes();
 
   const handleSelectVault = async () => {
     const success = await selectVault();

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { format } from "date-fns";
+import { useVault } from "@/contexts/VaultContext";
 
 interface DailyNoteResult {
   success: boolean;
@@ -19,9 +20,8 @@ interface DailyNoteAPI {
   listDailyNoteDates: (vaultPath: string) => Promise<DailyNoteDatesResult>;
 }
 
-const dailyAPI = (window as unknown as { electronAPI: DailyNoteAPI }).electronAPI;
-
-const VAULT_PATH_KEY = "vault-path";
+const dailyAPI = (window as unknown as { electronAPI: DailyNoteAPI })
+  .electronAPI;
 
 export interface UseDailyNotesReturn {
   vaultPath: string | null;
@@ -34,9 +34,7 @@ export interface UseDailyNotesReturn {
 }
 
 export function useDailyNotes(): UseDailyNotesReturn {
-  const [vaultPath] = useState<string | null>(() => {
-    return localStorage.getItem(VAULT_PATH_KEY);
-  });
+  const { vaultPath } = useVault();
   const [datesWithNotes, setDatesWithNotes] = useState<Set<string>>(new Set());
   const [isLoadingDates, setIsLoadingDates] = useState(false);
 

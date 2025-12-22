@@ -1,16 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
+import { useVault } from "@/contexts/VaultContext";
 
 interface NoteInfo {
   id: string;
   title: string;
   filePath: string;
   updatedAt: string;
-}
-
-interface SelectFolderResult {
-  success: boolean;
-  folderPath?: string;
-  canceled?: boolean;
 }
 
 interface ListNotesResult {
@@ -26,51 +21,28 @@ interface CreateNoteResult {
 }
 
 interface VaultAPI {
-  selectVaultFolder: () => Promise<SelectFolderResult>;
   listNotes: (folderPath: string) => Promise<ListNotesResult>;
   createNote: (folderPath: string, title: string) => Promise<CreateNoteResult>;
   getNotePath: (folderPath: string, noteId: string) => Promise<string | null>;
 }
 
-const vaultAPI = (
-  window as unknown as { electronAPI: VaultAPI }
-).electronAPI;
-
-const VAULT_PATH_KEY = "vault-path";
+const vaultAPI = (window as unknown as { electronAPI: VaultAPI }).electronAPI;
 
 export interface UseNotesReturn {
   vaultPath: string | null;
   notes: NoteInfo[];
   isLoading: boolean;
   error: string | null;
-  selectVault: () => Promise<boolean>;
   loadNotes: () => Promise<void>;
   createNote: (title: string) => Promise<NoteInfo | null>;
   getNotePath: (noteId: string) => Promise<string | null>;
 }
 
 export function useNotes(): UseNotesReturn {
-  const [vaultPath, setVaultPath] = useState<string | null>(() => {
-    return localStorage.getItem(VAULT_PATH_KEY);
-  });
+  const { vaultPath } = useVault();
   const [notes, setNotes] = useState<NoteInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const selectVault = useCallback(async (): Promise<boolean> => {
-    try {
-      const result = await vaultAPI.selectVaultFolder();
-      if (result.success && result.folderPath) {
-        setVaultPath(result.folderPath);
-        localStorage.setItem(VAULT_PATH_KEY, result.folderPath);
-        return true;
-      }
-      return false;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to select vault");
-      return false;
-    }
-  }, []);
 
   const loadNotes = useCallback(async () => {
     if (!vaultPath) return;
@@ -138,7 +110,6 @@ export function useNotes(): UseNotesReturn {
     notes,
     isLoading,
     error,
-    selectVault,
     loadNotes,
     createNote,
     getNotePath,

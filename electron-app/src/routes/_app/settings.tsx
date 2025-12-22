@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,14 +18,31 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useVault } from "@/contexts/VaultContext";
+import { FolderOpen, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
+  const navigate = useNavigate();
+  const { vaultPath, selectVault, closeVault } = useVault();
+
   const handleSaveTemplate = () => {
     toast.success("Template saved successfully!");
+  };
+
+  const handleChangeVault = async () => {
+    const success = await selectVault();
+    if (success) {
+      toast.success("Vault changed successfully!");
+    }
+  };
+
+  const handleCloseVault = async () => {
+    await closeVault();
+    navigate({ to: "/" });
   };
 
   return (
@@ -53,16 +70,29 @@ function SettingsPage() {
                   Manage your notes vault location
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <div>
                   <Label className="text-muted-foreground mb-1">
                     Current Vault
                   </Label>
-                  <p className="text-sm">~/Documents/my-vault</p>
+                  <p className="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">
+                    {vaultPath || "No vault selected"}
+                  </p>
                 </div>
-                <Button variant="link" className="p-0 h-auto">
-                  Change Vault
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleChangeVault}>
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Change Vault
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={handleCloseVault}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Close Vault
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
