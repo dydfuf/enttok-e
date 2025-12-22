@@ -227,3 +227,84 @@ export async function getNotePath(
     return null;
   }
 }
+
+// ========== Daily Notes Functions ==========
+
+export function getDailyNotePath(vaultPath: string, date: string): string {
+  return path.join(vaultPath, "daily", `${date}.md`);
+}
+
+export interface DailyNoteResult {
+  success: boolean;
+  filePath?: string;
+  error?: string;
+}
+
+export async function createDailyNote(
+  vaultPath: string,
+  date: string
+): Promise<DailyNoteResult> {
+  try {
+    const dailyDir = path.join(vaultPath, "daily");
+    await mkdir(dailyDir, { recursive: true });
+
+    const filePath = getDailyNotePath(vaultPath, date);
+
+    // Check if file already exists
+    try {
+      await stat(filePath);
+      // File exists, return it
+      return { success: true, filePath };
+    } catch {
+      // File doesn't exist, create it
+    }
+
+    // Create with template
+    const content = `# ${date}\n\n## Tasks\n\n- [ ] \n\n## Notes\n\n`;
+    await fsWriteFile(filePath, content, "utf-8");
+
+    return { success: true, filePath };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to create daily note",
+    };
+  }
+}
+
+export interface DailyNoteDatesResult {
+  success: boolean;
+  dates?: string[];
+  error?: string;
+}
+
+export async function listDailyNoteDates(
+  vaultPath: string
+): Promise<DailyNoteDatesResult> {
+  try {
+    const dailyDir = path.join(vaultPath, "daily");
+
+    try {
+      await stat(dailyDir);
+    } catch {
+      // Directory doesn't exist yet
+      return { success: true, dates: [] };
+    }
+
+    const files = await readdir(dailyDir);
+    const dates = files
+      .filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f))
+      .map((f) => f.replace(".md", ""));
+
+    return { success: true, dates };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to list daily note dates",
+    };
+  }
+}

@@ -26,4 +26,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("vault:create-note", folderPath, title),
   getNotePath: (folderPath: string, noteId: string) =>
     ipcRenderer.invoke("vault:get-note-path", folderPath, noteId),
+
+  // Daily Notes API
+  getDailyNotePath: (vaultPath: string, date: string) =>
+    ipcRenderer.invoke("daily:get-path", vaultPath, date),
+  createDailyNote: (vaultPath: string, date: string) =>
+    ipcRenderer.invoke("daily:create", vaultPath, date),
+  listDailyNoteDates: (vaultPath: string) =>
+    ipcRenderer.invoke("daily:list-dates", vaultPath),
 });

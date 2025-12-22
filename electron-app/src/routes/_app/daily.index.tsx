@@ -1,28 +1,26 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { parseISO, isToday } from "date-fns";
+import { isToday } from "date-fns";
 import { FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditorLayout } from "@/components/editor/EditorLayout";
 import { DailyHeader } from "@/components/daily/DailyHeader";
 import { useDailyNotes } from "@/hooks/useDailyNotes";
 
-export const Route = createFileRoute("/_app/daily/$date")({
-  component: DailyDatePage,
+export const Route = createFileRoute("/_app/daily/")({
+  component: DailyIndexPage,
 });
 
-function DailyDatePage() {
-  const { date: dateParam } = Route.useParams();
+function DailyIndexPage() {
   const navigate = useNavigate();
-
-  // Parse the date from URL
-  const selectedDate = parseISO(dateParam);
+  const today = new Date();
 
   const {
     vaultPath,
     datesWithNotes,
     createOrGetDailyNote,
     formatDateForStorage,
+    loadDatesWithNotes,
   } = useDailyNotes();
 
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -39,7 +37,7 @@ function DailyDatePage() {
       setIsLoading(true);
       setError(null);
 
-      const result = await createOrGetDailyNote(selectedDate);
+      const result = await createOrGetDailyNote(today);
       if (result) {
         setFilePath(result.filePath);
       } else {
@@ -50,12 +48,12 @@ function DailyDatePage() {
 
     loadOrCreateNote();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vaultPath, dateParam]);
+  }, [vaultPath]);
 
   const handleNavigate = (date: Date) => {
     const dateStr = formatDateForStorage(date);
     if (isToday(date)) {
-      navigate({ to: "/daily" });
+      loadDatesWithNotes();
     } else {
       navigate({ to: "/daily/$date", params: { date: dateStr } });
     }
@@ -92,7 +90,7 @@ function DailyDatePage() {
       <div className="h-full p-6">
         <div className="max-w-3xl mx-auto text-center py-12">
           <p className="text-destructive mb-4">{error || "Failed to load note"}</p>
-          <Button onClick={() => navigate({ to: "/daily" })}>Go to Today</Button>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
         </div>
       </div>
     );
@@ -102,7 +100,7 @@ function DailyDatePage() {
     <div className="h-full flex flex-col">
       <div className="px-6 pt-6">
         <DailyHeader
-          date={selectedDate}
+          date={today}
           datesWithNotes={datesWithNotes}
           onNavigate={handleNavigate}
         />

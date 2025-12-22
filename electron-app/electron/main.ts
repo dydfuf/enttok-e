@@ -10,6 +10,9 @@ import {
   listMarkdownFiles,
   createNote,
   getNotePath,
+  getDailyNotePath,
+  createDailyNote,
+  listDailyNoteDates,
 } from "./file-handlers.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,4 +77,15 @@ ipcMain.handle("vault:create-note", (_, folderPath: string, title: string) =>
 );
 ipcMain.handle("vault:get-note-path", (_, folderPath: string, noteId: string) =>
   getNotePath(folderPath, noteId)
+);
+
+// IPC Handlers for daily notes
+ipcMain.handle("daily:get-path", (_, vaultPath: string, date: string) =>
+  getDailyNotePath(vaultPath, date)
+);
+ipcMain.handle("daily:create", (_, vaultPath: string, date: string) =>
+  createDailyNote(vaultPath, date)
+);
+ipcMain.handle("daily:list-dates", (_, vaultPath: string) =>
+  listDailyNoteDates(vaultPath)
 );
