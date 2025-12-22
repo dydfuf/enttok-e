@@ -1,14 +1,8 @@
-import { useState, useEffect } from "react";
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable";
+import { useEffect } from "react";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useAutoSave } from "@/hooks/useAutoSave";
-import { MarkdownEditor } from "./MarkdownEditor";
-import { MarkdownPreview } from "./MarkdownPreview";
-import { EditorToolbar, type ViewMode } from "./EditorToolbar";
+import { LivePreviewEditor } from "./LivePreviewEditor";
+import { EditorToolbar } from "./EditorToolbar";
 import { cn } from "@/lib/utils";
 
 interface EditorLayoutProps {
@@ -20,8 +14,6 @@ export function EditorLayout({
   initialFilePath,
   className,
 }: EditorLayoutProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("split");
-
   const {
     filePath,
     content,
@@ -56,8 +48,6 @@ export function EditorLayout({
     <div className={cn("flex h-full flex-col", className)}>
       {/* Toolbar */}
       <EditorToolbar
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
         onNew={createNewFile}
         onOpen={openFile}
         onSave={saveFile}
@@ -73,35 +63,13 @@ export function EditorLayout({
         </div>
       )}
 
-      {/* Editor area */}
+      {/* Editor area - Live Preview */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === "editor" && (
-          <MarkdownEditor
-            value={content}
-            onChange={setContent}
-            className="h-full"
-          />
-        )}
-
-        {viewMode === "preview" && (
-          <MarkdownPreview content={content} className="h-full" />
-        )}
-
-        {viewMode === "split" && (
-          <ResizablePanelGroup orientation="horizontal" className="h-full">
-            <ResizablePanel defaultSize={50} minSize={20}>
-              <MarkdownEditor
-                value={content}
-                onChange={setContent}
-                className="h-full"
-              />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={50} minSize={20}>
-              <MarkdownPreview content={content} className="h-full" />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+        <LivePreviewEditor
+          value={content}
+          onChange={setContent}
+          className="h-full"
+        />
       </div>
     </div>
   );

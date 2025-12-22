@@ -1,13 +1,5 @@
-import {
-  FolderOpen,
-  Save,
-  FilePlus,
-  PanelLeft,
-  Columns2,
-  PanelRight,
-} from "lucide-react";
+import { FolderOpen, Save, FilePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -17,11 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export type ViewMode = "editor" | "split" | "preview";
-
 interface EditorToolbarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
@@ -32,8 +20,6 @@ interface EditorToolbarProps {
 }
 
 export function EditorToolbar({
-  viewMode,
-  onViewModeChange,
   onNew,
   onOpen,
   onSave,
@@ -110,55 +96,6 @@ export function EditorToolbar({
 
         {/* Spacer */}
         <div className="flex-1" />
-
-        {/* View mode toggle */}
-        <ToggleGroup
-          type="single"
-          value={viewMode}
-          onValueChange={(value) => {
-            if (value) onViewModeChange(value as ViewMode);
-          }}
-          className="h-8"
-        >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <ToggleGroupItem
-                value="editor"
-                aria-label="Editor only"
-                className="h-8 w-8 p-0"
-              >
-                <PanelLeft className="h-4 w-4" />
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>Editor only</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <ToggleGroupItem
-                value="split"
-                aria-label="Split view"
-                className="h-8 w-8 p-0"
-              >
-                <Columns2 className="h-4 w-4" />
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>Split view</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <ToggleGroupItem
-                value="preview"
-                aria-label="Preview only"
-                className="h-8 w-8 p-0"
-              >
-                <PanelRight className="h-4 w-4" />
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>Preview only</TooltipContent>
-          </Tooltip>
-        </ToggleGroup>
       </div>
     </TooltipProvider>
   );
