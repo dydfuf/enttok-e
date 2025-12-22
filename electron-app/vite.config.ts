@@ -17,6 +17,7 @@ export default defineConfig({
     viteReact(),
     tailwindcss(),
   ],
+  base: "./",
   build: {
     outDir: "dist-react",
     emptyOutDir: true,
