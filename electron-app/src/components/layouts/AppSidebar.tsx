@@ -35,7 +35,7 @@ export default function AppSidebar() {
     <Sidebar collapsible="icon" variant="sidebar">
       <SidebarHeader className="h-12 flex-row items-center justify-between px-2">
         <span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
-          Enttokk
+          Enttok-e
         </span>
         <SidebarTrigger />
       </SidebarHeader>

@@ -1,6 +1,6 @@
 {
-  "appId": "com.kakaoent.enttokk-e",
-  "productName": "Enttokk-E",
+  "appId": "com.kakaoent.enttok-e",
+  "productName": "Enttok-E",
   "directories": {
     "output": "release",
     "buildResources": "build"

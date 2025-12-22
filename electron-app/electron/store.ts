@@ -13,7 +13,7 @@ interface StoreSchema {
 }
 
 const store = new Store<StoreSchema>({
-  name: "enttokk-config",
+  name: "enttok-config",
   defaults: {
     currentVaultPath: null,
     recentVaults: [],

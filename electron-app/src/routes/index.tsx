@@ -61,7 +61,7 @@ function VaultSelectPage() {
       <div className="max-w-md w-full p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Welcome to Enttokk-e
+            Welcome to Enttok-e
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Local-first work journal with AI-powered suggestions
@@ -69,11 +69,7 @@ function VaultSelectPage() {
         </div>
 
         <div className="space-y-4">
-          <Button
-            onClick={handleOpenVault}
-            className="w-full py-6"
-            size="lg"
-          >
+          <Button onClick={handleOpenVault} className="w-full py-6" size="lg">
             <FolderOpen className="h-5 w-5 mr-2" />
             Open Vault
           </Button>

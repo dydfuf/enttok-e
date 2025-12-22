@@ -101,7 +101,7 @@ function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Appearance</CardTitle>
-                <CardDescription>Customize how Enttokk-e looks</CardDescription>
+                <CardDescription>Customize how Enttok-e looks</CardDescription>
               </CardHeader>
               <CardContent>
                 <div>
@@ -161,7 +161,7 @@ tags: [daily]
                 <CardTitle>About</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Enttokk-e v0.1.0</p>
+                <p>Enttok-e v0.1.0</p>
                 <p>Local-first work journal with AI-powered suggestions</p>
               </CardContent>
             </Card>

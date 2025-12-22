@@ -1,7 +1,7 @@
 {
   "name": "electron-app",
   "version": "1.0.0",
-  "description": "Enttokk-E Note Application",
+  "description": "Enttok-E Note Application",
   "author": "Kakao Entertainment",
   "main": "dist-electron/electron/main.js",
   "private": true,
