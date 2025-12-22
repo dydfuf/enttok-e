@@ -1,15 +1,20 @@
 import { Outlet } from "@tanstack/react-router";
-import Sidebar from "./Sidebar";
-import SuggestionPanel from "./SuggestionPanel";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import AppSidebar from "./AppSidebar";
+import SuggestionSidebar from "./SuggestionSidebar";
 
 export default function AppLayout() {
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-950">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
-      <SuggestionPanel />
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </SidebarInset>
+      <SidebarProvider className="min-h-0 w-auto flex-none">
+        <SuggestionSidebar />
+      </SidebarProvider>
+    </SidebarProvider>
   );
 }
