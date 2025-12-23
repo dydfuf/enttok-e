@@ -4,7 +4,7 @@ import os
 
 from fastapi import FastAPI
 
-from app.api import claude, events, health, jobs, status
+from app.api import calendar, claude, events, health, jobs, status
 from app.core.config import ensure_dirs
 from app.core.logging import configure_logging
 from app.db.connection import close_db, connect_db
@@ -22,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(claude.router)
     app.include_router(events.router)
+    app.include_router(calendar.router)
 
     @app.on_event("startup")
     async def on_startup() -> None:
