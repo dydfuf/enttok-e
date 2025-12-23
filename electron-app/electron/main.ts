@@ -28,9 +28,20 @@ const __dirname = path.dirname(__filename);
 const isDev = process.env.NODE_ENV === "development";
 
 function createWindow() {
+  const isMac = process.platform === "darwin";
+
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    titleBarStyle: isMac ? "hiddenInset" : undefined,
+    titleBarOverlay: isMac
+      ? {
+          color: "#00000000",
+          symbolColor: "#ffffff",
+          height: 32,
+        }
+      : undefined,
+    trafficLightPosition: isMac ? { x: 12, y: 12 } : undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
