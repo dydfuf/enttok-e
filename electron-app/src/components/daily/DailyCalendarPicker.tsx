@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -23,19 +22,11 @@ export function DailyCalendarPicker({
   onDateSelect,
 }: DailyCalendarPickerProps) {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
 
   const handleSelect = (date: Date | undefined) => {
     if (date) {
       onDateSelect(date);
       setOpen(false);
-
-      const dateStr = format(date, "yyyy-MM-dd");
-      if (isSameDay(date, new Date())) {
-        navigate({ to: "/daily" });
-      } else {
-        navigate({ to: "/daily/$date", params: { date: dateStr } });
-      }
     }
   };
 

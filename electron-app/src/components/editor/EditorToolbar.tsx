@@ -28,7 +28,7 @@ export function EditorToolbar({
   filePath,
   className,
 }: EditorToolbarProps) {
-  const fileName = filePath ? filePath.split("/").pop() : "Untitled";
+  const fileName = filePath ? filePath.split(/[\\/]/).pop() : "Untitled";
 
   return (
     <TooltipProvider delayDuration={300}>

@@ -1,4 +1,5 @@
 import Store from "electron-store";
+import path from "path";
 
 export interface VaultInfo {
   path: string;
@@ -39,7 +40,7 @@ export function getRecentVaults(): VaultInfo[] {
 }
 
 export function addToRecentVaults(vaultPath: string): void {
-  const name = vaultPath.split("/").pop() || vaultPath;
+  const name = path.basename(vaultPath) || vaultPath;
   const recentVaults = store.get("recentVaults");
   const maxRecent = store.get("maxRecentVaults");
 

@@ -4,32 +4,11 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
-
-export interface VaultInfo {
-  path: string;
-  name: string;
-  lastOpened: string;
-}
-
-interface SelectFolderResult {
-  success: boolean;
-  folderPath?: string;
-  canceled?: boolean;
-}
-
-interface VaultStoreAPI {
-  selectVaultFolder: () => Promise<SelectFolderResult>;
-  getCurrentVault: () => Promise<string | null>;
-  setCurrentVault: (vaultPath: string) => Promise<{ success: boolean }>;
-  clearCurrentVault: () => Promise<{ success: boolean }>;
-  getRecentVaults: () => Promise<VaultInfo[]>;
-  removeRecentVault: (vaultPath: string) => Promise<{ success: boolean }>;
-}
-
-const electronAPI = (window as unknown as { electronAPI: VaultStoreAPI })
-  .electronAPI;
+import { requireElectronAPI } from "@/lib/electron";
+import type { VaultInfo } from "@/shared/electron-api";
 
 interface VaultContextType {
   vaultPath: string | null;
@@ -50,6 +29,7 @@ interface VaultProviderProps {
 }
 
 export function VaultProvider({ children }: VaultProviderProps) {
+  const electronAPI = useMemo(() => requireElectronAPI(), []);
   const [vaultPath, setVaultPath] = useState<string | null>(null);
   const [recentVaults, setRecentVaults] = useState<VaultInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,12 +59,12 @@ export function VaultProvider({ children }: VaultProviderProps) {
       }
     };
     initialize();
-  }, []);
+  }, [electronAPI]);
 
   const refreshRecentVaults = useCallback(async () => {
     const recents = await electronAPI.getRecentVaults();
     setRecentVaults(recents);
-  }, []);
+  }, [electronAPI]);
 
   const selectVault = useCallback(async (): Promise<boolean> => {
     const result = await electronAPI.selectVaultFolder();
@@ -95,7 +75,7 @@ export function VaultProvider({ children }: VaultProviderProps) {
       return true;
     }
     return false;
-  }, [refreshRecentVaults]);
+  }, [electronAPI, refreshRecentVaults]);
 
   const openVault = useCallback(
     async (path: string): Promise<boolean> => {
@@ -104,20 +84,20 @@ export function VaultProvider({ children }: VaultProviderProps) {
       await refreshRecentVaults();
       return true;
     },
-    [refreshRecentVaults]
+    [electronAPI, refreshRecentVaults]
   );
 
   const closeVault = useCallback(async () => {
     await electronAPI.clearCurrentVault();
     setVaultPath(null);
-  }, []);
+  }, [electronAPI]);
 
   const removeRecentVault = useCallback(
     async (path: string) => {
       await electronAPI.removeRecentVault(path);
       await refreshRecentVaults();
     },
-    [refreshRecentVaults]
+    [electronAPI, refreshRecentVaults]
   );
 
   return (

@@ -7,38 +7,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-
-export type BackendStatus = "stopped" | "starting" | "running" | "stopping" | "error";
-
-export type BackendState = {
-  status: BackendStatus;
-  pid: number | null;
-  port: number | null;
-  token: string | null;
-  startedAt: number | null;
-  lastExitCode: number | null;
-  lastSignal: string | null;
-  lastError: string | null;
-};
-
-export type BackendLog = {
-  level: "info" | "warn" | "error";
-  message: string;
-  timestamp: string;
-};
-
-type BackendHealth = {
-  healthy: boolean;
-};
-
-type BackendAPI = {
-  startBackend: () => Promise<BackendState>;
-  stopBackend: () => Promise<BackendState>;
-  getBackendStatus: () => Promise<BackendState>;
-  checkBackendHealth: () => Promise<BackendHealth>;
-  onBackendLog: (handler: (payload: BackendLog) => void) => () => void;
-  onBackendStatus: (handler: (payload: BackendState) => void) => () => void;
-};
+import type {
+  BackendHealth,
+  BackendLog,
+  BackendState,
+} from "@/shared/electron-api";
+import { getElectronAPI } from "@/lib/electron";
 
 type BackendContextValue = {
   state: BackendState | null;
@@ -51,14 +25,6 @@ type BackendContextValue = {
 const BackendContext = createContext<BackendContextValue | null>(null);
 
 const LOG_LIMIT = 200;
-
-function getElectronAPI(): BackendAPI | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const api = (window as unknown as { electronAPI?: BackendAPI }).electronAPI;
-  return api ?? null;
-}
 
 export function BackendProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BackendState | null>(null);

@@ -1,34 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
-
-interface FileResult {
-  success: boolean;
-  data?: string;
-  error?: string;
-}
-
-interface OpenDialogResult {
-  filePath: string;
-  content: string;
-}
-
-interface SaveDialogResult {
-  success: boolean;
-  filePath?: string;
-  canceled?: boolean;
-  error?: string;
-}
-
-interface ElectronAPI {
-  send: (channel: string, data: unknown) => void;
-  receive: (channel: string, func: (...args: unknown[]) => void) => void;
-  readFile: (filePath: string) => Promise<FileResult>;
-  writeFile: (filePath: string, content: string) => Promise<FileResult>;
-  openFileDialog: () => Promise<OpenDialogResult | null>;
-  saveFileDialog: (defaultPath?: string) => Promise<SaveDialogResult>;
-}
-
-// Type assertion helper for Electron API
-const electronAPI = (window as unknown as { electronAPI: ElectronAPI }).electronAPI;
+import type { FileResult } from "@/shared/electron-api";
+import { requireElectronAPI } from "@/lib/electron";
 
 export interface UseFileSystemReturn {
   filePath: string | null;
@@ -45,6 +17,7 @@ export interface UseFileSystemReturn {
 }
 
 export function useFileSystem(initialContent = ""): UseFileSystemReturn {
+  const electronAPI = requireElectronAPI();
   const [filePath, setFilePath] = useState<string | null>(null);
   const [content, setContentState] = useState(initialContent);
   const [savedContent, setSavedContent] = useState(initialContent);
@@ -92,30 +65,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  const saveFile = useCallback(async (): Promise<boolean> => {
-    if (!filePath) {
-      return saveFileAs();
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await electronAPI.writeFile(filePath, content);
-      if (result.success) {
-        setSavedContent(content);
-        return true;
-      }
-      setError(result.error || "Failed to save file");
-      return false;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save file");
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [filePath, content]);
+  }, [electronAPI]);
 
   const saveFileAs = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
@@ -147,14 +97,37 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [filePath, content]);
+  }, [electronAPI, filePath, content]);
+
+  const saveFile = useCallback(async (): Promise<boolean> => {
+    if (!filePath) {
+      return saveFileAs();
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await electronAPI.writeFile(filePath, content);
+      if (result.success) {
+        setSavedContent(content);
+        return true;
+      }
+      setError(result.error || "Failed to save file");
+      return false;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save file");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [electronAPI, filePath, content, saveFileAs]);
 
   const createNewFile = useCallback(() => {
     setFilePath(null);
     setContentState("");
     setSavedContent("");
     setError(null);
-  }, []);
+  }, [electronAPI]);
 
   // Keyboard shortcuts
   useEffect(() => {

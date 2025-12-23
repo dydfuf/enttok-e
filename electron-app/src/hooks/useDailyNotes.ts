@@ -1,27 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { format } from "date-fns";
 import { useVault } from "@/contexts/VaultContext";
-
-interface DailyNoteResult {
-  success: boolean;
-  filePath?: string;
-  error?: string;
-}
-
-interface DailyNoteDatesResult {
-  success: boolean;
-  dates?: string[];
-  error?: string;
-}
-
-interface DailyNoteAPI {
-  getDailyNotePath: (vaultPath: string, date: string) => Promise<string>;
-  createDailyNote: (vaultPath: string, date: string) => Promise<DailyNoteResult>;
-  listDailyNoteDates: (vaultPath: string) => Promise<DailyNoteDatesResult>;
-}
-
-const dailyAPI = (window as unknown as { electronAPI: DailyNoteAPI })
-  .electronAPI;
+import type {
+  DailyNoteDatesResult,
+  DailyNoteResult,
+} from "@/shared/electron-api";
+import { requireElectronAPI } from "@/lib/electron";
 
 export interface UseDailyNotesReturn {
   vaultPath: string | null;
@@ -35,6 +19,7 @@ export interface UseDailyNotesReturn {
 
 export function useDailyNotes(): UseDailyNotesReturn {
   const { vaultPath } = useVault();
+  const dailyAPI = requireElectronAPI();
   const [datesWithNotes, setDatesWithNotes] = useState<Set<string>>(new Set());
   const [isLoadingDates, setIsLoadingDates] = useState(false);
 
@@ -47,14 +32,15 @@ export function useDailyNotes(): UseDailyNotesReturn {
 
     setIsLoadingDates(true);
     try {
-      const result = await dailyAPI.listDailyNoteDates(vaultPath);
+      const result: DailyNoteDatesResult =
+        await dailyAPI.listDailyNoteDates(vaultPath);
       if (result.success && result.dates) {
         setDatesWithNotes(new Set(result.dates));
       }
     } finally {
       setIsLoadingDates(false);
     }
-  }, [vaultPath]);
+  }, [dailyAPI, vaultPath]);
 
   const getDailyNotePath = useCallback(
     async (date: Date): Promise<string> => {
@@ -62,7 +48,7 @@ export function useDailyNotes(): UseDailyNotesReturn {
       const dateStr = formatDateForStorage(date);
       return dailyAPI.getDailyNotePath(vaultPath, dateStr);
     },
-    [vaultPath, formatDateForStorage]
+    [dailyAPI, vaultPath, formatDateForStorage]
   );
 
   const createOrGetDailyNote = useCallback(
@@ -70,7 +56,10 @@ export function useDailyNotes(): UseDailyNotesReturn {
       if (!vaultPath) return null;
 
       const dateStr = formatDateForStorage(date);
-      const result = await dailyAPI.createDailyNote(vaultPath, dateStr);
+      const result: DailyNoteResult = await dailyAPI.createDailyNote(
+        vaultPath,
+        dateStr
+      );
 
       if (result.success && result.filePath) {
         // Update the dates cache
@@ -80,7 +69,7 @@ export function useDailyNotes(): UseDailyNotesReturn {
 
       return null;
     },
-    [vaultPath, formatDateForStorage]
+    [dailyAPI, vaultPath, formatDateForStorage]
   );
 
   // Load dates on mount

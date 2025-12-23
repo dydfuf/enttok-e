@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBackend } from "@/contexts/BackendContext";
 import { cn } from "@/lib/utils";
+import type { RuntimeBinaryStatus, RuntimeStatus } from "@/shared/electron-api";
+import { getElectronAPI } from "@/lib/electron";
 
 const STATUS_LABELS: Record<string, string> = {
   stopped: "Stopped",
@@ -17,34 +19,6 @@ const STATUS_CLASSES: Record<string, string> = {
   stopping: "bg-amber-400",
   error: "bg-red-500",
 };
-
-type RuntimeBinaryStatus = {
-  found: boolean;
-  path: string | null;
-  version: string | null;
-  error: string | null;
-};
-
-type RuntimeStatus = {
-  node: RuntimeBinaryStatus;
-  npx: RuntimeBinaryStatus;
-  claude: RuntimeBinaryStatus;
-  lastCheckedAt: string | null;
-};
-
-type RuntimeAPI = {
-  checkRuntime: () => Promise<RuntimeStatus>;
-  getRuntimeStatus: () => Promise<RuntimeStatus>;
-  onRuntimeStatus: (handler: (payload: RuntimeStatus) => void) => () => void;
-};
-
-function getRuntimeAPI(): RuntimeAPI | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const api = (window as unknown as { electronAPI?: RuntimeAPI }).electronAPI;
-  return api ?? null;
-}
 
 function formatRuntimeLabel(status: RuntimeBinaryStatus | null) {
   if (!status) {
@@ -74,7 +48,7 @@ export default function BackendStatusPanel() {
       : "N/A";
 
   useEffect(() => {
-    const api = getRuntimeAPI();
+    const api = getElectronAPI();
     if (!api) {
       return;
     }

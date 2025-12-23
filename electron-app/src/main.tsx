@@ -6,7 +6,6 @@ import { RouterProvider, createRouter, createHashHistory } from '@tanstack/react
 import { routeTree } from './routeTree.gen'
 
 import './styles.css'
-import reportWebVitals from './reportWebVitals.ts'
 
 // Use hash history for Electron file:// protocol compatibility
 const hashHistory = createHashHistory()
@@ -39,8 +38,3 @@ if (rootElement && !rootElement.innerHTML) {
     </StrictMode>,
   )
 }
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals()

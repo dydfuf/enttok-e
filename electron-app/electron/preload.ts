@@ -1,7 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type {
+  BackendLog,
+  BackendState,
+  ElectronAPI,
+  RuntimeStatus,
+} from "../src/shared/electron-api";
 
 // Electron API를 렌더러 프로세스에 노출
-contextBridge.exposeInMainWorld("electronAPI", {
+const api: ElectronAPI = {
   // 기존 IPC 통신
   send: (channel: string, data: unknown) => {
     ipcRenderer.send(channel, data);
@@ -49,27 +55,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
   stopBackend: () => ipcRenderer.invoke("backend:stop"),
   getBackendStatus: () => ipcRenderer.invoke("backend:status"),
   checkBackendHealth: () => ipcRenderer.invoke("backend:health"),
-  onBackendLog: (handler: (payload: unknown) => void) => {
-    const listener = (_: Electron.IpcRendererEvent, payload: unknown) =>
+  onBackendLog: (handler: (payload: BackendLog) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: BackendLog) =>
       handler(payload);
     ipcRenderer.on("backend:log", listener);
-    return () => ipcRenderer.removeListener("backend:log", listener);
+    return () => {
+      ipcRenderer.removeListener("backend:log", listener);
+    };
   },
-  onBackendStatus: (handler: (payload: unknown) => void) => {
-    const listener = (_: Electron.IpcRendererEvent, payload: unknown) =>
+  onBackendStatus: (handler: (payload: BackendState) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: BackendState) =>
       handler(payload);
     ipcRenderer.on("backend:status", listener);
-    return () => ipcRenderer.removeListener("backend:status", listener);
+    return () => {
+      ipcRenderer.removeListener("backend:status", listener);
+    };
   },
 
   // Runtime dependency checks
   checkRuntime: () => ipcRenderer.invoke("runtime:check"),
   getRuntimeStatus: () => ipcRenderer.invoke("runtime:status"),
-  onRuntimeStatus: (handler: (payload: unknown) => void) => {
-    const listener = (_: Electron.IpcRendererEvent, payload: unknown) =>
+  onRuntimeStatus: (handler: (payload: RuntimeStatus) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: RuntimeStatus) =>
       handler(payload);
     ipcRenderer.on("runtime:status", listener);
-    return () => ipcRenderer.removeListener("runtime:status", listener);
+    return () => {
+      ipcRenderer.removeListener("runtime:status", listener);
+    };
   },
 
   // Claude spawn API
@@ -77,4 +89,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("claude:spawn", payload),
   createClaudeSession: () => ipcRenderer.invoke("claude:session"),
   getJob: (jobId: string) => ipcRenderer.invoke("backend:job", jobId),
-});
+};
+
+contextBridge.exposeInMainWorld("electronAPI", api);

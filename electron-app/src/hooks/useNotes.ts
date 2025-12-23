@@ -1,32 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useVault } from "@/contexts/VaultContext";
-
-interface NoteInfo {
-  id: string;
-  title: string;
-  filePath: string;
-  updatedAt: string;
-}
-
-interface ListNotesResult {
-  success: boolean;
-  notes?: NoteInfo[];
-  error?: string;
-}
-
-interface CreateNoteResult {
-  success: boolean;
-  note?: NoteInfo;
-  error?: string;
-}
-
-interface VaultAPI {
-  listNotes: (folderPath: string) => Promise<ListNotesResult>;
-  createNote: (folderPath: string, title: string) => Promise<CreateNoteResult>;
-  getNotePath: (folderPath: string, noteId: string) => Promise<string | null>;
-}
-
-const vaultAPI = (window as unknown as { electronAPI: VaultAPI }).electronAPI;
+import type {
+  CreateNoteResult,
+  ListNotesResult,
+  NoteInfo,
+} from "@/shared/electron-api";
+import { requireElectronAPI } from "@/lib/electron";
 
 export interface UseNotesReturn {
   vaultPath: string | null;
@@ -40,6 +19,7 @@ export interface UseNotesReturn {
 
 export function useNotes(): UseNotesReturn {
   const { vaultPath } = useVault();
+  const vaultAPI = requireElectronAPI();
   const [notes, setNotes] = useState<NoteInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +30,7 @@ export function useNotes(): UseNotesReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await vaultAPI.listNotes(vaultPath);
+      const result: ListNotesResult = await vaultAPI.listNotes(vaultPath);
       if (result.success && result.notes) {
         setNotes(result.notes);
       } else {
@@ -61,7 +41,7 @@ export function useNotes(): UseNotesReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [vaultPath]);
+  }, [vaultAPI, vaultPath]);
 
   const createNote = useCallback(
     async (title: string): Promise<NoteInfo | null> => {
@@ -73,7 +53,10 @@ export function useNotes(): UseNotesReturn {
       setIsLoading(true);
       setError(null);
       try {
-        const result = await vaultAPI.createNote(vaultPath, title);
+        const result: CreateNoteResult = await vaultAPI.createNote(
+          vaultPath,
+          title
+        );
         if (result.success && result.note) {
           setNotes((prev) => [result.note!, ...prev]);
           return result.note;
@@ -87,7 +70,7 @@ export function useNotes(): UseNotesReturn {
         setIsLoading(false);
       }
     },
-    [vaultPath]
+    [vaultAPI, vaultPath]
   );
 
   const getNotePath = useCallback(
@@ -95,7 +78,7 @@ export function useNotes(): UseNotesReturn {
       if (!vaultPath) return null;
       return vaultAPI.getNotePath(vaultPath, noteId);
     },
-    [vaultPath]
+    [vaultAPI, vaultPath]
   );
 
   // Load notes when vault path changes

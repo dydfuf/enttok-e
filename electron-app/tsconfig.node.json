@@ -8,5 +8,6 @@
       "outDir": "dist-electron",
       "rootDir": "."
     },
-    "include": ["electron/main.ts", "electron/file-handlers.ts", "electron/store.ts"]
+    "include": ["electron/**/*.ts"],
+    "exclude": ["electron/preload.ts"]
   }

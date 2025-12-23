@@ -10,36 +10,13 @@ import BackendStatusPanel from "@/components/BackendStatusPanel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-
-type ClaudeJobResponse = {
-  job_id: string;
-  status: string;
-};
-
-type ClaudeSessionResponse = {
-  session_id: string;
-};
-
-type ClaudeJobRecord = {
-  job_id: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  progress?: number | null;
-  message?: string | null;
-  payload?: Record<string, unknown>;
-  result?: {
-    stdout_tail?: string[];
-    stderr_tail?: string[];
-    exit_code?: number;
-  } | null;
-  error?: {
-    message?: string;
-    stdout_tail?: string[];
-    stderr_tail?: string[];
-    exit_code?: number;
-  } | null;
-};
+import type {
+  ClaudeJobRecord,
+  ClaudeJobResponse,
+  ClaudeSessionResponse,
+  ElectronAPI,
+} from "@/shared/electron-api";
+import { getElectronAPI } from "@/lib/electron";
 
 type SuggestionItem = {
   id: string;
@@ -50,19 +27,10 @@ type SuggestionItem = {
   error: string | null;
 };
 
-type ClaudeAPI = {
-  spawnClaude: (payload: Record<string, unknown>) => Promise<ClaudeJobResponse>;
-  createClaudeSession: () => Promise<ClaudeSessionResponse>;
-  getJob: (jobId: string) => Promise<ClaudeJobRecord>;
-};
-
-function getClaudeAPI(): ClaudeAPI | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const api = (window as unknown as { electronAPI?: ClaudeAPI }).electronAPI;
-  return api ?? null;
-}
+type ClaudeAPI = Pick<
+  ElectronAPI,
+  "spawnClaude" | "createClaudeSession" | "getJob"
+>;
 
 function extractOutput(job: ClaudeJobRecord) {
   if (job.result?.stdout_tail && job.result.stdout_tail.length > 0) {
@@ -83,7 +51,7 @@ export default function SuggestionSidebar() {
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const claudeAPI = useMemo(() => getClaudeAPI(), []);
+  const claudeAPI = useMemo<ClaudeAPI | null>(() => getElectronAPI(), []);
 
   const updateSuggestion = useCallback(
     (id: string, patch: Partial<SuggestionItem>) => {
@@ -140,11 +108,12 @@ export default function SuggestionSidebar() {
     try {
       let activeSessionId = sessionId;
       if (!activeSessionId) {
-        const session = await claudeAPI.createClaudeSession();
+        const session: ClaudeSessionResponse =
+          await claudeAPI.createClaudeSession();
         activeSessionId = session.session_id;
         setSessionId(activeSessionId);
       }
-      const response = await claudeAPI.spawnClaude({
+      const response: ClaudeJobResponse = await claudeAPI.spawnClaude({
         prompt: trimmed,
         session_id: activeSessionId,
       });
