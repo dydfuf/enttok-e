@@ -14,7 +14,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </SidebarInset>
-      <SidebarProvider className="min-h-0 w-auto flex-none">
+      <SidebarProvider className="min-h-0 w-auto flex-none" keyboardShortcut="l">
         <SidebarToggleBridge side="right" />
         <SuggestionSidebar />
       </SidebarProvider>
