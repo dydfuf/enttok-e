@@ -5,6 +5,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import BackendStatusPanel from "@/components/BackendStatusPanel";
 
 export default function SuggestionSidebar() {
   return (
@@ -20,6 +21,7 @@ export default function SuggestionSidebar() {
             <Lightbulb className="mx-auto mb-2 size-6 opacity-50" />
             Connect GitHub to get activity-based suggestions
           </div>
+          <BackendStatusPanel />
         </div>
       </SidebarContent>
       <SidebarRail />

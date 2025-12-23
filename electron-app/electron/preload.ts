@@ -43,4 +43,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getRecentVaults: () => ipcRenderer.invoke("store:get-recent-vaults"),
   removeRecentVault: (vaultPath: string) =>
     ipcRenderer.invoke("store:remove-recent-vault", vaultPath),
+
+  // Backend API
+  startBackend: () => ipcRenderer.invoke("backend:start"),
+  stopBackend: () => ipcRenderer.invoke("backend:stop"),
+  getBackendStatus: () => ipcRenderer.invoke("backend:status"),
+  checkBackendHealth: () => ipcRenderer.invoke("backend:health"),
+  onBackendLog: (handler: (payload: unknown) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: unknown) =>
+      handler(payload);
+    ipcRenderer.on("backend:log", listener);
+    return () => ipcRenderer.removeListener("backend:log", listener);
+  },
+  onBackendStatus: (handler: (payload: unknown) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: unknown) =>
+      handler(payload);
+    ipcRenderer.on("backend:status", listener);
+    return () => ipcRenderer.removeListener("backend:status", listener);
+  },
 });

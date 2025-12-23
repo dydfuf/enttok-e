@@ -6,6 +6,10 @@
     "buildResources": "build"
   },
   "files": ["dist-react/**/*", "dist-electron/**/*"],
+  "extraResources": [
+    { "from": "../backend", "to": "backend" }
+  ],
+  "asarUnpack": ["**/backend/**"],
   "mac": {
     "target": ["dmg", "zip"],
     "category": "public.app-category.productivity"
