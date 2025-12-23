@@ -4,14 +4,12 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarRail,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 export default function SuggestionSidebar() {
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="right">
-      <SidebarHeader className="h-12 flex-row items-center justify-between px-2">
-        <SidebarTrigger />
+      <SidebarHeader className="h-12 flex-row items-center px-3">
         <span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
           Suggestions
         </span>

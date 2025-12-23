@@ -16,12 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-
-const isMac =
-  typeof navigator !== "undefined" && /Mac|iPad|iPhone|iPod/.test(navigator.platform);
 
 const navItems = [
   { to: "/daily", label: "Today", icon: Calendar },
@@ -37,16 +32,10 @@ export default function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
-      <SidebarHeader
-        className={cn(
-          "h-12 flex-row items-center justify-between px-2",
-          isMac && "pl-16"
-        )}
-      >
+      <SidebarHeader className="h-12 flex-row items-center px-3">
         <span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
           Enttok-e
         </span>
-        <SidebarTrigger />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

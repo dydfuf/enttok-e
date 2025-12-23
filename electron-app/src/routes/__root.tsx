@@ -5,28 +5,31 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 import TitleBar from "../components/TitleBar";
 import { Toaster } from "@/components/ui/sonner";
 import { VaultProvider } from "@/contexts/VaultContext";
+import { SidebarControlsProvider } from "@/contexts/SidebarControlsContext";
 
 export const Route = createRootRoute({
   component: () => (
     <VaultProvider>
-      <div className="h-screen flex flex-col">
-        <TitleBar />
-        <div className="flex-1 overflow-hidden">
-          <Outlet />
+      <SidebarControlsProvider>
+        <div className="h-screen flex flex-col">
+          <TitleBar />
+          <div className="flex-1 overflow-hidden">
+            <Outlet />
+          </div>
+          <Toaster position="bottom-right" richColors />
+          <TanStackDevtools
+            config={{
+              position: "bottom-right",
+            }}
+            plugins={[
+              {
+                name: "Tanstack Router",
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
         </div>
-        <Toaster position="bottom-right" richColors />
-        <TanStackDevtools
-          config={{
-            position: "bottom-right",
-          }}
-          plugins={[
-            {
-              name: "Tanstack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
-      </div>
+      </SidebarControlsProvider>
     </VaultProvider>
   ),
 });
