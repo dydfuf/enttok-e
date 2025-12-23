@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { LivePreviewEditor } from "./LivePreviewEditor";
@@ -27,6 +27,17 @@ export function EditorLayout({
     loadFile,
   } = useFileSystem();
 
+  const contentRef = useRef(content);
+  const filePathRef = useRef(filePath);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  useEffect(() => {
+    filePathRef.current = filePath;
+  }, [filePath]);
+
   // Auto-save functionality
   useAutoSave({
     content,
@@ -43,6 +54,27 @@ export function EditorLayout({
       loadFile(initialFilePath);
     }
   }, [initialFilePath, loadFile]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ text?: string }>).detail;
+      if (!detail?.text || !filePathRef.current) {
+        return;
+      }
+      const trimmed = detail.text.trim();
+      if (!trimmed) {
+        return;
+      }
+      const current = contentRef.current || "";
+      const next = current ? `${current}\n\n${trimmed}\n` : `${trimmed}\n`;
+      setContent(next);
+    };
+
+    window.addEventListener("suggestion:apply", handler);
+    return () => {
+      window.removeEventListener("suggestion:apply", handler);
+    };
+  }, [setContent]);
 
   return (
     <div className={cn("flex h-full flex-col", className)}>

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useBackend } from "@/contexts/BackendContext";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +18,47 @@ const STATUS_CLASSES: Record<string, string> = {
   error: "bg-red-500",
 };
 
+type RuntimeBinaryStatus = {
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  error: string | null;
+};
+
+type RuntimeStatus = {
+  node: RuntimeBinaryStatus;
+  npx: RuntimeBinaryStatus;
+  claude: RuntimeBinaryStatus;
+  lastCheckedAt: string | null;
+};
+
+type RuntimeAPI = {
+  checkRuntime: () => Promise<RuntimeStatus>;
+  getRuntimeStatus: () => Promise<RuntimeStatus>;
+  onRuntimeStatus: (handler: (payload: RuntimeStatus) => void) => () => void;
+};
+
+function getRuntimeAPI(): RuntimeAPI | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const api = (window as unknown as { electronAPI?: RuntimeAPI }).electronAPI;
+  return api ?? null;
+}
+
+function formatRuntimeLabel(status: RuntimeBinaryStatus | null) {
+  if (!status) {
+    return "Checking";
+  }
+  if (!status.found) {
+    return "Not found";
+  }
+  return status.version ? status.version : "Found";
+}
+
 export default function BackendStatusPanel() {
   const { state, logs, health } = useBackend();
+  const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
 
   const lastLogs = useMemo(() => logs.slice(-6), [logs]);
   const status = state?.status ?? "stopped";
@@ -33,6 +72,37 @@ export default function BackendStatusPanel() {
           : "Unhealthy"
         : "Checking"
       : "N/A";
+
+  useEffect(() => {
+    const api = getRuntimeAPI();
+    if (!api) {
+      return;
+    }
+    let mounted = true;
+    api
+      .getRuntimeStatus()
+      .then((value) => {
+        if (mounted) {
+          setRuntime(value);
+        }
+      })
+      .catch(() => undefined);
+    api
+      .checkRuntime()
+      .then((value) => {
+        if (mounted) {
+          setRuntime(value);
+        }
+      })
+      .catch(() => undefined);
+    const off = api.onRuntimeStatus((value) => {
+      setRuntime(value);
+    });
+    return () => {
+      mounted = false;
+      off();
+    };
+  }, []);
 
   return (
     <div className="mt-6 border-t border-gray-200 dark:border-gray-800 pt-4">
@@ -68,6 +138,42 @@ export default function BackendStatusPanel() {
             ))}
           </ul>
         )}
+      </div>
+      <div className="mt-4 border-t border-gray-200 dark:border-gray-800 pt-3">
+        <div className="text-xs font-medium text-gray-600 dark:text-gray-300">
+          Runtime
+        </div>
+        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+          {[
+            { label: "Node", status: runtime?.node ?? null },
+            { label: "npx", status: runtime?.npx ?? null },
+            { label: "Claude", status: runtime?.claude ?? null },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    item.status
+                      ? item.status.found
+                        ? "bg-emerald-500"
+                        : "bg-red-500"
+                      : "bg-amber-400"
+                  )}
+                />
+                <span className="text-gray-700 dark:text-gray-300">
+                  {item.label}
+                </span>
+              </div>
+              <span>{formatRuntimeLabel(item.status)}</span>
+            </div>
+          ))}
+          {runtime?.lastCheckedAt && (
+            <div className="text-[11px] text-muted-foreground">
+              Checked {runtime.lastCheckedAt}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -4,10 +4,11 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -16,6 +17,9 @@ BACKEND_TOKEN = os.environ.get("BACKEND_TOKEN", "")
 APP_DATA_DIR = os.environ.get("APP_DATA_DIR", os.path.join(os.getcwd(), "data"))
 LOG_DIR = os.environ.get("LOG_DIR", os.path.join(APP_DATA_DIR, "logs"))
 BACKEND_WORKERS = int(os.environ.get("BACKEND_WORKERS", "2"))
+SESSION_MAX_MESSAGES = int(os.environ.get("CLAUDE_SESSION_MAX_MESSAGES", "20"))
+SESSION_MAX_CHARS = int(os.environ.get("CLAUDE_SESSION_MAX_CHARS", "12000"))
+SESSION_OUTPUT_LINES = int(os.environ.get("CLAUDE_SESSION_OUTPUT_LINES", "200"))
 
 os.makedirs(APP_DATA_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -56,6 +60,18 @@ class JobRecord(BaseModel):
     error: Optional[Dict[str, Any]] = None
 
 
+class ClaudeSpawnRequest(BaseModel):
+    args: List[str] = Field(default_factory=list)
+    prompt: Optional[str] = None
+    stdin: Optional[str] = None
+    session_id: Optional[str] = None
+    timeout_ms: Optional[int] = None
+
+
+class ClaudeSessionResponse(BaseModel):
+    session_id: str
+
+
 app = FastAPI(title="Enttok Backend", version="0.1.0")
 
 connections: set[WebSocket] = set()
@@ -65,6 +81,15 @@ started_at = time.time()
 
 db_lock = asyncio.Lock()
 db_conn: sqlite3.Connection | None = None
+
+
+class SessionMessage(TypedDict):
+    role: str
+    content: str
+
+
+session_lock = asyncio.Lock()
+sessions: Dict[str, List[SessionMessage]] = {}
 
 
 def init_db(conn: sqlite3.Connection) -> None:
@@ -279,6 +304,10 @@ async def process_job(job_id: str) -> None:
     if job["status"] == "canceled":
         return
 
+    if job["type"] == "claude.spawn":
+        await run_claude_job(job_id, job.get("payload", {}))
+        return
+
     await update_job(job_id, status="running", progress=0.0)
     await broadcast(
         {"type": "job.status", "job_id": job_id, "status": "running"}
@@ -316,6 +345,196 @@ async def process_job(job_id: str) -> None:
             error={"message": str(exc)},
         )
         await record_event(job_id, "error", "job failed", {"error": str(exc)})
+        await broadcast(
+            {"type": "job.status", "job_id": job_id, "status": "failed"}
+        )
+
+
+def resolve_claude_path() -> Optional[str]:
+    cli_path = os.environ.get("CLAUDE_CODE_CLI_PATH")
+    if cli_path and os.path.exists(cli_path):
+        return cli_path
+    return shutil.which("claude")
+
+
+async def read_stream_lines(
+    stream: asyncio.StreamReader,
+    level: str,
+    prefix: str,
+    collector: List[str],
+    limit: int,
+) -> None:
+    while True:
+        line = await stream.readline()
+        if not line:
+            break
+        text = line.decode(errors="replace").rstrip()
+        await emit_log(level, f"{prefix}{text}")
+        collector.append(text)
+        if len(collector) > limit:
+            collector.pop(0)
+
+
+async def get_session_messages(session_id: str) -> List[SessionMessage]:
+    async with session_lock:
+        return list(sessions.get(session_id, []))
+
+
+async def append_session_message(
+    session_id: str, role: str, content: str
+) -> None:
+    if not content.strip():
+        return
+    async with session_lock:
+        messages = sessions.setdefault(session_id, [])
+        messages.append({"role": role, "content": content})
+        while len(messages) > SESSION_MAX_MESSAGES:
+            messages.pop(0)
+        total_chars = sum(len(msg["content"]) for msg in messages)
+        while total_chars > SESSION_MAX_CHARS and messages:
+            removed = messages.pop(0)
+            total_chars -= len(removed["content"])
+
+
+def format_session_prompt(
+    history: List[SessionMessage], prompt: str
+) -> str:
+    transcript: List[str] = []
+    for message in history:
+        role_label = "User" if message["role"] == "user" else "Assistant"
+        transcript.append(f"{role_label}: {message['content']}")
+    transcript.append(f"User: {prompt}")
+    return "\n\n".join(transcript)
+
+
+async def run_claude_job(job_id: str, payload: Dict[str, Any]) -> None:
+    claude_path = resolve_claude_path()
+    if not claude_path:
+        await update_job(
+            job_id,
+            status="failed",
+            error={"message": "claude cli not found"},
+        )
+        await record_event(job_id, "error", "claude cli not found")
+        await broadcast(
+            {"type": "job.status", "job_id": job_id, "status": "failed"}
+        )
+        return
+
+    session_id = payload.get("session_id")
+    args = payload.get("args") or []
+    raw_prompt = payload.get("prompt")
+    prompt = raw_prompt
+    if session_id and raw_prompt:
+        history = await get_session_messages(session_id)
+        prompt = format_session_prompt(history, raw_prompt)
+    if prompt and not args:
+        args = ["--print", prompt]
+    if not args:
+        await update_job(
+            job_id,
+            status="failed",
+            error={"message": "no args provided for claude cli"},
+        )
+        await record_event(job_id, "error", "claude cli args missing")
+        await broadcast(
+            {"type": "job.status", "job_id": job_id, "status": "failed"}
+        )
+        return
+
+    timeout_ms = payload.get("timeout_ms")
+    timeout_sec = None if timeout_ms is None else max(timeout_ms / 1000.0, 1.0)
+    stdin_payload = payload.get("stdin")
+
+    await update_job(job_id, status="running", progress=0.05, message="spawning")
+    await broadcast({"type": "job.status", "job_id": job_id, "status": "running"})
+
+    stdout_lines: List[str] = []
+    stderr_lines: List[str] = []
+    started = time.time()
+
+    process = await asyncio.create_subprocess_exec(
+        claude_path,
+        *args,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=os.environ.copy(),
+    )
+
+    if stdin_payload:
+        process.stdin.write(stdin_payload.encode())
+        await process.stdin.drain()
+    if process.stdin:
+        process.stdin.close()
+
+    stdout_task = asyncio.create_task(
+        read_stream_lines(
+            process.stdout, "info", "claude: ", stdout_lines, SESSION_OUTPUT_LINES
+        )
+    )
+    stderr_task = asyncio.create_task(
+        read_stream_lines(
+            process.stderr, "error", "claude: ", stderr_lines, SESSION_OUTPUT_LINES
+        )
+    )
+
+    try:
+        if timeout_sec:
+            await asyncio.wait_for(process.wait(), timeout=timeout_sec)
+        else:
+            await process.wait()
+    except asyncio.TimeoutError:
+        process.kill()
+        await update_job(
+            job_id,
+            status="failed",
+            error={"message": "claude cli timeout"},
+        )
+        await record_event(job_id, "error", "claude cli timeout")
+        await broadcast(
+            {"type": "job.status", "job_id": job_id, "status": "failed"}
+        )
+        return
+    finally:
+        await asyncio.gather(stdout_task, stderr_task, return_exceptions=True)
+
+    duration_ms = int((time.time() - started) * 1000)
+    exit_code = process.returncode
+    stdout_tail = stdout_lines[-50:] if stdout_lines else []
+    stderr_tail = stderr_lines[-50:] if stderr_lines else []
+    if exit_code == 0:
+        if session_id and raw_prompt:
+            assistant_output = "\n".join(stdout_lines).strip()
+            await append_session_message(session_id, "user", raw_prompt)
+            await append_session_message(session_id, "assistant", assistant_output)
+        await update_job(
+            job_id,
+            status="succeeded",
+            progress=1.0,
+            result={
+                "exit_code": exit_code,
+                "duration_ms": duration_ms,
+                "stdout_tail": stdout_tail,
+                "stderr_tail": stderr_tail,
+            },
+        )
+        await record_event(job_id, "info", "claude cli finished")
+        await broadcast(
+            {"type": "job.status", "job_id": job_id, "status": "succeeded"}
+        )
+    else:
+        await update_job(
+            job_id,
+            status="failed",
+            error={
+                "message": "claude cli failed",
+                "exit_code": exit_code,
+                "stdout_tail": stdout_tail,
+                "stderr_tail": stderr_tail,
+            },
+        )
+        await record_event(job_id, "error", "claude cli failed")
         await broadcast(
             {"type": "job.status", "job_id": job_id, "status": "failed"}
         )
@@ -394,6 +613,28 @@ async def create_job_api(
     return JobResponse(job_id=job_id, status="queued")
 
 
+@app.post("/claude/spawn", response_model=JobResponse)
+async def spawn_claude_api(
+    request: ClaudeSpawnRequest, _: None = Depends(verify_token)
+) -> JobResponse:
+    payload = request.model_dump()
+    job_id = await create_job("claude.spawn", payload)
+    await job_queue.put(job_id)
+    await emit_log("info", f"claude job queued {job_id}")
+    return JobResponse(job_id=job_id, status="queued")
+
+
+@app.post("/claude/session", response_model=ClaudeSessionResponse)
+async def create_claude_session(
+    _: None = Depends(verify_token),
+) -> ClaudeSessionResponse:
+    session_id = f"session_{uuid.uuid4().hex}"
+    async with session_lock:
+        sessions[session_id] = []
+    await emit_log("info", f"claude session created {session_id}")
+    return ClaudeSessionResponse(session_id=session_id)
+
+
 @app.get("/jobs")
 async def list_jobs(_: None = Depends(verify_token)) -> Dict[str, Any]:
     return {"jobs": await fetch_jobs()}
@@ -448,4 +689,3 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
-

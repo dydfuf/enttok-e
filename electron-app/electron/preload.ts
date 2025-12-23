@@ -61,4 +61,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("backend:status", listener);
     return () => ipcRenderer.removeListener("backend:status", listener);
   },
+
+  // Runtime dependency checks
+  checkRuntime: () => ipcRenderer.invoke("runtime:check"),
+  getRuntimeStatus: () => ipcRenderer.invoke("runtime:status"),
+  onRuntimeStatus: (handler: (payload: unknown) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: unknown) =>
+      handler(payload);
+    ipcRenderer.on("runtime:status", listener);
+    return () => ipcRenderer.removeListener("runtime:status", listener);
+  },
+
+  // Claude spawn API
+  spawnClaude: (payload: Record<string, unknown>) =>
+    ipcRenderer.invoke("claude:spawn", payload),
+  createClaudeSession: () => ipcRenderer.invoke("claude:session"),
+  getJob: (jobId: string) => ipcRenderer.invoke("backend:job", jobId),
 });

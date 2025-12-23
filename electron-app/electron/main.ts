@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain } from "electron";
-import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import http from "http";
 import net from "net";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
@@ -47,6 +48,20 @@ type BackendState = {
 
 type BackendLogLevel = "info" | "warn" | "error";
 
+type RuntimeBinaryStatus = {
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  error: string | null;
+};
+
+type RuntimeStatus = {
+  node: RuntimeBinaryStatus;
+  npx: RuntimeBinaryStatus;
+  claude: RuntimeBinaryStatus;
+  lastCheckedAt: string | null;
+};
+
 let backendProcess: ChildProcessWithoutNullStreams | null = null;
 let backendState: BackendState = {
   status: "stopped",
@@ -59,6 +74,14 @@ let backendState: BackendState = {
   lastError: null,
 };
 let backendStartPromise: Promise<BackendState> | null = null;
+
+let runtimeStatus: RuntimeStatus = {
+  node: { found: false, path: null, version: null, error: null },
+  npx: { found: false, path: null, version: null, error: null },
+  claude: { found: false, path: null, version: null, error: null },
+  lastCheckedAt: null,
+};
+let runtimeCheckPromise: Promise<RuntimeStatus> | null = null;
 
 function broadcastBackendStatus() {
   for (const window of BrowserWindow.getAllWindows()) {
@@ -83,6 +106,230 @@ function emitBackendLog(level: BackendLogLevel, message: string) {
 function updateBackendState(partial: Partial<BackendState>) {
   backendState = { ...backendState, ...partial };
   broadcastBackendStatus();
+}
+
+function broadcastRuntimeStatus() {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("runtime:status", runtimeStatus);
+  }
+}
+
+function splitPathList(value: string | undefined) {
+  if (!value) {
+    return [];
+  }
+  return value.split(path.delimiter).filter((entry) => entry.trim().length > 0);
+}
+
+function mergePathList(additions: string[], existing?: string) {
+  const combined = [...additions, ...splitPathList(existing)];
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const entry of combined) {
+    if (!seen.has(entry)) {
+      seen.add(entry);
+      deduped.push(entry);
+    }
+  }
+  return deduped.join(path.delimiter);
+}
+
+function getStandardBinDirs() {
+  if (process.platform === "win32") {
+    const dirs = [];
+    const programFiles = process.env.ProgramFiles;
+    const programFilesX86 = process.env["ProgramFiles(x86)"];
+    if (programFiles) {
+      dirs.push(path.join(programFiles, "nodejs"));
+    }
+    if (programFilesX86) {
+      dirs.push(path.join(programFilesX86, "nodejs"));
+    }
+    return dirs;
+  }
+  if (process.platform === "darwin") {
+    return ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"];
+  }
+  return ["/usr/local/bin", "/usr/bin", "/bin"];
+}
+
+function getNvmBinDirs() {
+  if (process.platform === "win32") {
+    return [];
+  }
+  const nvmBase = path.join(os.homedir(), ".nvm", "versions", "node");
+  if (!fs.existsSync(nvmBase)) {
+    return [];
+  }
+  try {
+    const versions = fs.readdirSync(nvmBase);
+    versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    return versions.map((version) => path.join(nvmBase, version, "bin"));
+  } catch {
+    return [];
+  }
+}
+
+function getExecutableNames(name: string) {
+  if (process.platform !== "win32") {
+    return [name];
+  }
+  const extensions = name === "node" ? [".exe"] : [".cmd", ".exe"];
+  return extensions.map((ext) => `${name}${ext}`).concat(name);
+}
+
+function findExecutable(name: string, dirs: string[]) {
+  const executables = getExecutableNames(name);
+  for (const dir of dirs) {
+    for (const execName of executables) {
+      const fullPath = path.join(dir, execName);
+      if (fs.existsSync(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+  return null;
+}
+
+function findExistingPath(paths: string[]) {
+  for (const candidate of paths) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function execFileWithOutput(
+  command: string,
+  args: string[],
+  timeoutMs = 2000
+) {
+  return new Promise<{
+    stdout: string;
+    stderr: string;
+    error: Error | null;
+  }>((resolve) => {
+    execFile(command, args, { timeout: timeoutMs }, (error, stdout, stderr) => {
+      resolve({
+        stdout: stdout?.toString() ?? "",
+        stderr: stderr?.toString() ?? "",
+        error: error ?? null,
+      });
+    });
+  });
+}
+
+async function readVersion(command: string, args: string[]) {
+  const { stdout, stderr, error } = await execFileWithOutput(command, args);
+  const output = `${stdout}${stderr}`.trim();
+  return {
+    version: output || null,
+    error: error ? error.message : null,
+  };
+}
+
+async function getNpmGlobalBin(npmPath: string | null) {
+  if (!npmPath) {
+    return null;
+  }
+  const { stdout } = await execFileWithOutput(npmPath, ["root", "-g"]);
+  const root = stdout.trim();
+  if (!root) {
+    return null;
+  }
+  const libNodeModules = path.join("lib", "node_modules");
+  if (root.endsWith(libNodeModules)) {
+    return path.join(path.dirname(path.dirname(root)), "bin");
+  }
+  return path.join(root, "bin");
+}
+
+async function buildBinaryStatus(
+  pathValue: string | null,
+  versionArgs: string[]
+): Promise<RuntimeBinaryStatus> {
+  if (!pathValue) {
+    return { found: false, path: null, version: null, error: "not-found" };
+  }
+  const { version, error } = await readVersion(pathValue, versionArgs);
+  return {
+    found: true,
+    path: pathValue,
+    version,
+    error,
+  };
+}
+
+async function refreshRuntimeStatus() {
+  if (runtimeCheckPromise) {
+    return runtimeCheckPromise;
+  }
+  runtimeCheckPromise = (async () => {
+    const pathDirs = splitPathList(process.env.PATH);
+    const standardDirs = getStandardBinDirs();
+    const nvmDirs = getNvmBinDirs();
+    const searchDirs = [...standardDirs, ...pathDirs, ...nvmDirs];
+
+    const nodePath = findExecutable("node", searchDirs);
+    const npxPath = findExecutable("npx", searchDirs);
+    const npmPath = findExecutable("npm", searchDirs);
+    const npmGlobalBin = await getNpmGlobalBin(npmPath);
+
+    const claudeCandidates = [
+      path.join(os.homedir(), ".npm-global", "bin", "claude"),
+      "/usr/local/bin/claude",
+      "/opt/homebrew/bin/claude",
+    ];
+    if (npmGlobalBin) {
+      claudeCandidates.unshift(path.join(npmGlobalBin, "claude"));
+    }
+    const claudePath =
+      findExistingPath(claudeCandidates) ||
+      findExecutable("claude", nvmDirs) ||
+      findExecutable("claude", searchDirs);
+
+    const nodeStatus = await buildBinaryStatus(nodePath, ["--version"]);
+    const npxStatus = await buildBinaryStatus(npxPath, ["--version"]);
+    const claudeStatus = await buildBinaryStatus(claudePath, ["--version"]);
+
+    runtimeStatus = {
+      node: nodeStatus,
+      npx: npxStatus,
+      claude: claudeStatus,
+      lastCheckedAt: new Date().toISOString(),
+    };
+
+    broadcastRuntimeStatus();
+    return runtimeStatus;
+  })();
+
+  try {
+    return await runtimeCheckPromise;
+  } finally {
+    runtimeCheckPromise = null;
+  }
+}
+
+function applyRuntimeEnv(
+  env: NodeJS.ProcessEnv,
+  status: RuntimeStatus
+) {
+  const extraPaths: string[] = [];
+  if (status.node.path) {
+    extraPaths.push(path.dirname(status.node.path));
+  }
+  if (status.npx.path) {
+    extraPaths.push(path.dirname(status.npx.path));
+  }
+  if (status.claude.path) {
+    env.CLAUDE_CODE_CLI_PATH = status.claude.path;
+    extraPaths.push(path.dirname(status.claude.path));
+  }
+  if (extraPaths.length > 0) {
+    env.PATH = mergePathList(extraPaths, env.PATH);
+  }
+  return env;
 }
 
 function ensureBackendDirs() {
@@ -248,9 +495,9 @@ async function startBackend() {
     }
     emitBackendLog("info", `backend spawn: ${command} ${args.join(" ")}`);
 
-    backendProcess = spawn(command, args, {
-      cwd,
-      env: {
+    const runtime = await refreshRuntimeStatus();
+    const env = applyRuntimeEnv(
+      {
         ...process.env,
         BACKEND_PORT: String(port),
         BACKEND_TOKEN: token,
@@ -259,6 +506,12 @@ async function startBackend() {
         RUN_ENV: app.isPackaged ? "prod" : "dev",
         PYTHONUNBUFFERED: "1",
       },
+      runtime
+    );
+
+    backendProcess = spawn(command, args, {
+      cwd,
+      env,
       shell: process.platform === "win32",
     });
 
@@ -350,6 +603,61 @@ async function healthCheck() {
     backendState.token
   );
   return { healthy };
+}
+
+function requestBackendJson(
+  method: string,
+  requestPath: string,
+  body?: Record<string, unknown>
+) {
+  if (!backendState.port || !backendState.token) {
+    return Promise.reject(new Error("backend not running"));
+  }
+
+  const payload = body ? JSON.stringify(body) : null;
+
+  return new Promise<unknown>((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: "127.0.0.1",
+        port: backendState.port,
+        path: requestPath,
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Backend-Token": backendState.token,
+          ...(payload ? { "Content-Length": Buffer.byteLength(payload) } : {}),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => {
+          data += chunk.toString();
+        });
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 400) {
+            reject(new Error(`backend error ${res.statusCode}: ${data}`));
+            return;
+          }
+          if (!data) {
+            resolve(null);
+            return;
+          }
+          try {
+            resolve(JSON.parse(data));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
+
+    req.on("error", reject);
+    if (payload) {
+      req.write(payload);
+    }
+    req.end();
+  });
 }
 
 function createWindow() {
@@ -458,3 +766,18 @@ ipcMain.handle("backend:start", () => startBackend());
 ipcMain.handle("backend:stop", () => stopBackend());
 ipcMain.handle("backend:status", () => backendState);
 ipcMain.handle("backend:health", () => healthCheck());
+
+// IPC Handlers for runtime dependency checks
+ipcMain.handle("runtime:check", () => refreshRuntimeStatus());
+ipcMain.handle("runtime:status", () => runtimeStatus);
+
+// IPC Handlers for Claude jobs
+ipcMain.handle("claude:spawn", async (_event, payload: Record<string, unknown>) =>
+  requestBackendJson("POST", "/claude/spawn", payload)
+);
+ipcMain.handle("backend:job", async (_event, jobId: string) =>
+  requestBackendJson("GET", `/jobs/${jobId}`)
+);
+ipcMain.handle("claude:session", async () =>
+  requestBackendJson("POST", "/claude/session")
+);
