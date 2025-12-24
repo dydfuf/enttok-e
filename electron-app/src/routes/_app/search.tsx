@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_app/search")({
 
 function SearchPage() {
   return (
-    <div className="h-full p-6">
+    <div className="min-h-full p-6">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6">
           <Input

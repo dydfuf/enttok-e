@@ -288,7 +288,7 @@ function CalendarPage() {
 
 	if (!isBackendReady) {
 		return (
-			<div className="h-full p-6">
+			<div className="min-h-full p-6">
 				<div className="max-w-3xl">
 					<div className="flex items-center gap-3">
 						<CalendarDays className="w-8 h-8" />
@@ -304,7 +304,7 @@ function CalendarPage() {
 
 	if (!accounts.length && !isCalendarLoading) {
 		return (
-			<div className="h-full p-6">
+			<div className="min-h-full p-6">
 				<div className="max-w-3xl">
 					<div className="flex items-center gap-3">
 						<CalendarDays className="w-8 h-8" />
@@ -325,7 +325,7 @@ function CalendarPage() {
 	}
 
 	return (
-		<div className="h-full flex flex-col p-6">
+		<div className="min-h-full flex flex-col p-6">
 			<div className="flex items-center justify-between mb-4">
 				<div>
 					<div className="flex items-center gap-2">
@@ -427,8 +427,8 @@ function CalendarPage() {
 					/>
 				</Card>
 
-				<Card className="flex-1 min-w-0 p-4">
-					<div className="flex items-center justify-between mb-4">
+				<Card className="flex-1 min-w-0 min-h-0 p-4 overflow-hidden">
+					<div className="flex items-center justify-between mb-4 shrink-0">
 						<div className="text-sm font-semibold">일정</div>
 						<div className="flex items-center gap-2">
 							<Button
@@ -448,11 +448,11 @@ function CalendarPage() {
 						</div>
 					</div>
 					{error && (
-						<div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+						<div className="mb-4 shrink-0 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
 							{error}
 						</div>
 					)}
-					<ScrollArea className="h-[calc(100%-48px)]">
+					<ScrollArea className="flex-1 min-h-0">
 						{isLoading ? (
 							<div className="text-sm text-muted-foreground">Loading...</div>
 						) : (

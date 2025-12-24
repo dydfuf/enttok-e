@@ -50,14 +50,14 @@ function VaultSelectPage() {
 
   if (!isInitialized || isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="min-h-full flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="max-w-md w-full p-8">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">

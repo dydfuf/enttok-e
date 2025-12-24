@@ -11,6 +11,7 @@ interface StoreSchema {
   currentVaultPath: string | null;
   recentVaults: VaultInfo[];
   maxRecentVaults: number;
+  dailyCalendarCollapsed: boolean;
 }
 
 const store = new Store<StoreSchema>({
@@ -19,6 +20,7 @@ const store = new Store<StoreSchema>({
     currentVaultPath: null,
     recentVaults: [],
     maxRecentVaults: 10,
+    dailyCalendarCollapsed: true,
   },
 });
 
@@ -58,6 +60,14 @@ export function removeFromRecentVaults(vaultPath: string): void {
   const recentVaults = store.get("recentVaults");
   const filtered = recentVaults.filter((v) => v.path !== vaultPath);
   store.set("recentVaults", filtered);
+}
+
+export function getDailyCalendarCollapsed(): boolean {
+  return store.get("dailyCalendarCollapsed");
+}
+
+export function setDailyCalendarCollapsed(collapsed: boolean): void {
+  store.set("dailyCalendarCollapsed", collapsed);
 }
 
 export function hasVault(): boolean {

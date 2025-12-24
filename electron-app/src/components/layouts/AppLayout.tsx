@@ -6,11 +6,11 @@ import { SidebarToggleBridge } from "@/contexts/SidebarControlsContext";
 
 export default function AppLayout() {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-full min-h-0">
       <SidebarToggleBridge side="left" />
       <AppSidebar />
-      <SidebarInset>
-        <main className="flex-1 overflow-y-auto">
+      <SidebarInset className="min-h-0">
+        <main className="flex-1 min-h-0 overflow-y-auto">
           <Outlet />
         </main>
       </SidebarInset>

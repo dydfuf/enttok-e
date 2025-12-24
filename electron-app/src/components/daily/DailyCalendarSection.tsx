@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, format, parseISO, startOfDay } from "date-fns";
-import { CalendarDays, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import { CalendarEventDetail } from "@/components/calendar/CalendarEventDetail";
 import { useVault } from "@/contexts/VaultContext";
+import { getElectronAPI } from "@/lib/electron";
 import type { CalendarEvent } from "@/lib/calendar-api";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -23,11 +30,13 @@ export type DailyCalendarSectionProps = {
 
 export function DailyCalendarSection({ date }: DailyCalendarSectionProps) {
 	const navigate = useNavigate();
+	const electronAPI = useMemo(() => getElectronAPI(), []);
 	const { vaultPath } = useVault();
 	const { accounts, isLoading: isAccountLoading, triggerSync } = useCalendar();
 	const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 	const [isSyncing, setIsSyncing] = useState(false);
 	const [autoSyncDone, setAutoSyncDone] = useState(false);
+	const [isOpen, setIsOpen] = useState(false);
 
 	const accountLabelMap = useMemo(() => {
 		return new Map(
@@ -83,6 +92,24 @@ export function DailyCalendarSection({ date }: DailyCalendarSectionProps) {
 		[accountLabelMap],
 	);
 
+	useEffect(() => {
+		if (!electronAPI) {
+			return;
+		}
+		let isMounted = true;
+		electronAPI
+			.getDailyCalendarCollapsed()
+			.then((collapsed) => {
+				if (isMounted) {
+					setIsOpen(!collapsed);
+				}
+			})
+			.catch(() => {});
+		return () => {
+			isMounted = false;
+		};
+	}, [electronAPI]);
+
 	const handleSync = async () => {
 		if (isSyncing) return;
 		setIsSyncing(true);
@@ -126,12 +153,12 @@ export function DailyCalendarSection({ date }: DailyCalendarSectionProps) {
 
 	if (!accounts.length && !isAccountLoading) {
 		return (
-			<Card className="mt-4 p-4">
+			<Card className="mt-3 gap-3 p-3">
 				<div className="flex items-center gap-2">
 					<CalendarDays className="h-4 w-4" />
 					<div className="text-sm font-semibold">오늘 일정</div>
 				</div>
-				<div className="mt-3 text-sm text-muted-foreground">
+				<div className="mt-2 text-xs text-muted-foreground">
 					캘린더 계정을 연결하면 오늘 일정을 표시할 수 있어요.
 				</div>
 				<Button
@@ -144,138 +171,173 @@ export function DailyCalendarSection({ date }: DailyCalendarSectionProps) {
 		);
 	}
 
+	const handleOpenChange = (nextOpen: boolean) => {
+		setIsOpen(nextOpen);
+		if (electronAPI) {
+			void electronAPI.setDailyCalendarCollapsed(!nextOpen);
+		}
+	};
+
 	return (
-		<Card className="mt-4 p-4">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<CalendarDays className="h-4 w-4" />
-					<div className="text-sm font-semibold">오늘 일정</div>
-					<div className="text-xs text-muted-foreground">
-						{events.length}개
+		<Collapsible open={isOpen} onOpenChange={handleOpenChange}>
+			<Card className="mt-3 gap-3 p-3">
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-2">
+						<CalendarDays className="h-4 w-4" />
+						<div className="text-sm font-semibold">오늘 일정</div>
+						<div className="text-xs text-muted-foreground">
+							{events.length}개
+						</div>
+					</div>
+					<div className="flex items-center gap-2">
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							onClick={handleSync}
+							disabled={!accounts.length || isSyncing}
+						>
+							<RefreshCw
+								className={
+									isLoading || isSyncing ? "h-4 w-4 animate-spin" : "h-4 w-4"
+								}
+							/>
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => navigate({ to: "/calendar" })}
+						>
+							캘린더 열기
+						</Button>
+						<CollapsibleTrigger asChild>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={isOpen ? "일정 접기" : "일정 펼치기"}
+							>
+								<ChevronDown
+									className={`h-4 w-4 transition-transform ${
+										isOpen ? "rotate-180" : ""
+									}`}
+								/>
+							</Button>
+						</CollapsibleTrigger>
 					</div>
 				</div>
-				<div className="flex items-center gap-2">
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={handleSync}
-						disabled={!accounts.length || isSyncing}
-					>
-						<RefreshCw
-							className={
-								isLoading || isSyncing ? "h-4 w-4 animate-spin" : "h-4 w-4"
-							}
-						/>
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => navigate({ to: "/calendar" })}
-					>
-						캘린더 열기
-					</Button>
-				</div>
-			</div>
 
-			{error && (
-				<div className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-					{error}
-				</div>
-			)}
+				<CollapsibleContent>
+					{error && (
+						<div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+							{error}
+						</div>
+					)}
 
-			{isLoading ? (
-				<div className="mt-3 text-sm text-muted-foreground">일정을 불러오는 중...</div>
-			) : events.length === 0 ? (
-				<div className="mt-3 text-sm text-muted-foreground">오늘 일정이 없습니다.</div>
-			) : (
-				<div className="mt-3 space-y-3">
-					{allDayEvents.length > 0 && (
-						<div className="space-y-2">
-							<div className="text-xs font-semibold text-muted-foreground">
-								종일 일정
-							</div>
-							{allDayEvents.map((event) => (
-								<button
-									key={`${event.calendar_id}-${event.event_id}`}
-									className="w-full text-left rounded-md border border-border px-3 py-2 hover:border-primary/60 hover:bg-muted/30"
-									onClick={() => setSelectedEvent(event)}
-								>
-									<div className="flex items-center justify-between">
-										<div className="text-sm font-medium truncate">
-											{event.title}
+					{isLoading ? (
+						<div className="mt-2 text-sm text-muted-foreground">
+							일정을 불러오는 중...
+						</div>
+					) : events.length === 0 ? (
+						<div className="mt-2 text-sm text-muted-foreground">
+							오늘 일정이 없습니다.
+						</div>
+					) : (
+						<ScrollArea className="mt-2 max-h-44">
+							<div className="space-y-2 pr-2">
+								{allDayEvents.length > 0 && (
+									<div className="space-y-1.5">
+										<div className="text-xs font-semibold text-muted-foreground">
+											종일 일정
 										</div>
-										<span
-											className="ml-2 h-2 w-2 rounded-full"
-											style={{
-												backgroundColor: event.calendar_color || "#94a3b8",
-											}}
-										/>
+										{allDayEvents.map((event) => (
+											<button
+												key={`${event.calendar_id}-${event.event_id}`}
+												className="w-full text-left rounded-md border border-border px-2.5 py-1.5 hover:border-primary/60 hover:bg-muted/30"
+												onClick={() => setSelectedEvent(event)}
+											>
+												<div className="flex items-center justify-between">
+													<div className="text-sm font-medium truncate">
+														{event.title}
+													</div>
+													<span
+														className="ml-2 h-2 w-2 rounded-full"
+														style={{
+															backgroundColor: event.calendar_color || "#94a3b8",
+														}}
+													/>
+												</div>
+												<div className="text-xs text-muted-foreground mt-1">
+													종일
+												</div>
+											</button>
+										))}
 									</div>
-									<div className="text-xs text-muted-foreground mt-1">종일</div>
-								</button>
-							))}
-						</div>
-					)}
+								)}
 
-					{timedEvents.length > 0 && (
-						<div className="space-y-2">
-							<div className="text-xs font-semibold text-muted-foreground">
-								시간 일정
-							</div>
-							{timedEvents.map((event) => {
-								const isCurrent =
-									nowSec >= event.start_ts && nowSec <= event.end_ts;
-								return (
-									<button
-										key={`${event.calendar_id}-${event.event_id}`}
-										className={`w-full text-left rounded-md border px-3 py-2 hover:border-primary/60 hover:bg-muted/30 ${
-											isCurrent
-												? "border-primary/60 bg-primary/5"
-												: "border-border"
-										}`}
-										onClick={() => setSelectedEvent(event)}
-									>
-										<div className="flex items-center justify-between">
-											<div className="text-sm font-medium truncate">
-												{event.title}
-											</div>
-											<span
-												className="ml-2 h-2 w-2 rounded-full"
-												style={{
-													backgroundColor: event.calendar_color || "#94a3b8",
-												}}
-											/>
+								{timedEvents.length > 0 && (
+									<div className="space-y-1.5">
+										<div className="text-xs font-semibold text-muted-foreground">
+											시간 일정
 										</div>
-								<div className="text-xs text-muted-foreground mt-1">
-									{format(parseISO(event.start_time), "HH:mm")} -
-									{format(parseISO(event.end_time), "HH:mm")}
-								</div>
-							</button>
-						);
-					})}
-						</div>
+										{timedEvents.map((event) => {
+											const isCurrent =
+												nowSec >= event.start_ts && nowSec <= event.end_ts;
+											return (
+												<button
+													key={`${event.calendar_id}-${event.event_id}`}
+													className={`w-full text-left rounded-md border px-2.5 py-1.5 hover:border-primary/60 hover:bg-muted/30 ${
+														isCurrent
+															? "border-primary/60 bg-primary/5"
+															: "border-border"
+													}`}
+													onClick={() => setSelectedEvent(event)}
+												>
+													<div className="flex items-center justify-between">
+														<div className="text-sm font-medium truncate">
+															{event.title}
+														</div>
+														<span
+															className="ml-2 h-2 w-2 rounded-full"
+															style={{
+																backgroundColor: event.calendar_color || "#94a3b8",
+															}}
+														/>
+													</div>
+													<div className="text-xs text-muted-foreground mt-1">
+														{format(parseISO(event.start_time), "HH:mm")} -
+														{format(parseISO(event.end_time), "HH:mm")}
+													</div>
+												</button>
+											);
+										})}
+									</div>
+								)}
+							</div>
+						</ScrollArea>
 					)}
-				</div>
-			)}
+				</CollapsibleContent>
 
-			<Dialog
-				open={!!selectedEvent}
-				onOpenChange={(open) => {
-					if (!open) setSelectedEvent(null);
-				}}
-			>
-				<DialogContent className="max-w-xl">
-					{selectedEvent && (
-						<CalendarEventDetail
-							event={selectedEvent}
-							vaultPath={vaultPath}
-							onNoteCreated={(note) =>
-								navigate({ to: "/notes/$noteId", params: { noteId: note.id } })
-							}
-						/>
-					)}
-				</DialogContent>
-			</Dialog>
-		</Card>
+				<Dialog
+					open={!!selectedEvent}
+					onOpenChange={(open) => {
+						if (!open) setSelectedEvent(null);
+					}}
+				>
+					<DialogContent className="max-w-xl">
+						{selectedEvent && (
+							<CalendarEventDetail
+								event={selectedEvent}
+								vaultPath={vaultPath}
+								onNoteCreated={(note) =>
+									navigate({
+										to: "/notes/$noteId",
+										params: { noteId: note.id },
+									})
+								}
+							/>
+						)}
+					</DialogContent>
+				</Dialog>
+			</Card>
+		</Collapsible>
 	);
 }

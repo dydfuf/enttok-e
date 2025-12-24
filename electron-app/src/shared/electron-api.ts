@@ -146,6 +146,10 @@ export type ElectronAPI = {
   clearCurrentVault: () => Promise<{ success: boolean }>;
   getRecentVaults: () => Promise<VaultInfo[]>;
   removeRecentVault: (vaultPath: string) => Promise<{ success: boolean }>;
+  getDailyCalendarCollapsed: () => Promise<boolean>;
+  setDailyCalendarCollapsed: (
+    collapsed: boolean
+  ) => Promise<{ success: boolean }>;
   startBackend: () => Promise<BackendState>;
   stopBackend: () => Promise<BackendState>;
   getBackendStatus: () => Promise<BackendState>;

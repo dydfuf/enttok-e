@@ -67,7 +67,7 @@ function NotesIndexPage() {
   // No vault selected
   if (!vaultPath) {
     return (
-      <div className="h-full p-6">
+      <div className="min-h-full p-6">
         <div className="max-w-3xl mx-auto">
           <div className="text-center py-12">
             <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -86,7 +86,7 @@ function NotesIndexPage() {
   }
 
   return (
-    <div className="h-full p-6">
+    <div className="min-h-full p-6">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>

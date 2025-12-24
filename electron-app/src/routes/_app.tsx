@@ -20,7 +20,7 @@ function VaultGuard() {
 
   if (!isInitialized || isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="min-h-full flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );

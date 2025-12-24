@@ -51,6 +51,10 @@ const api: ElectronAPI = {
   getRecentVaults: () => ipcRenderer.invoke("store:get-recent-vaults"),
   removeRecentVault: (vaultPath: string) =>
     ipcRenderer.invoke("store:remove-recent-vault", vaultPath),
+  getDailyCalendarCollapsed: () =>
+    ipcRenderer.invoke("store:get-daily-calendar-collapsed"),
+  setDailyCalendarCollapsed: (collapsed: boolean) =>
+    ipcRenderer.invoke("store:set-daily-calendar-collapsed", collapsed),
 
   // Backend API
   startBackend: () => ipcRenderer.invoke("backend:start"),

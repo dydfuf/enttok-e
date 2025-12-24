@@ -133,7 +133,7 @@ function SettingsPage() {
 	};
 
 	return (
-		<div className="h-full p-6">
+		<div className="min-h-full p-6">
 			<div className="max-w-3xl mx-auto">
 				<div className="mb-6">
 					<h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">

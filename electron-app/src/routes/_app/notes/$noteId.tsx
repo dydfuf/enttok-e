@@ -40,7 +40,7 @@ function NoteDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="min-h-full flex items-center justify-center">
         <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -48,7 +48,7 @@ function NoteDetailPage() {
 
   if (error || !filePath) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="min-h-full flex items-center justify-center">
         <div className="text-center">
           <p className="text-destructive mb-2">{error || "Note not found"}</p>
           <button

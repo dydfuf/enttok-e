@@ -96,7 +96,7 @@ function CalendarIntegrationPage() {
 
 	if (!isReady) {
 		return (
-			<div className="h-full p-6">
+			<div className="min-h-full p-6">
 				<div className="max-w-3xl mx-auto">
 					<div className="mb-6">
 						<Link
@@ -123,7 +123,7 @@ function CalendarIntegrationPage() {
 	}
 
 	return (
-		<div className="h-full p-6">
+		<div className="min-h-full p-6">
 			<div className="max-w-3xl mx-auto">
 				<div className="mb-6">
 					<Link

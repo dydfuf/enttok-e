@@ -19,6 +19,8 @@ import {
   clearCurrentVaultPath,
   getRecentVaults,
   removeFromRecentVaults,
+  getDailyCalendarCollapsed,
+  setDailyCalendarCollapsed,
 } from "../store.js";
 import {
   getBackendState,
@@ -79,6 +81,13 @@ export function registerIpcHandlers() {
   ipcMain.handle("store:get-recent-vaults", () => getRecentVaults());
   ipcMain.handle("store:remove-recent-vault", (_, vaultPath: string) => {
     removeFromRecentVaults(vaultPath);
+    return { success: true };
+  });
+  ipcMain.handle("store:get-daily-calendar-collapsed", () =>
+    getDailyCalendarCollapsed()
+  );
+  ipcMain.handle("store:set-daily-calendar-collapsed", (_, collapsed: boolean) => {
+    setDailyCalendarCollapsed(collapsed);
     return { success: true };
   });
 
