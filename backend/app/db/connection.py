@@ -46,6 +46,20 @@ def init_db(conn: sqlite3.Connection) -> None:
         );
         """
     )
+    conn.execute(
+        """
+        create table if not exists calendar_accounts (
+          account_id text primary key,
+          provider text not null,
+          email text,
+          display_name text,
+          credentials_json text,
+          config_json text,
+          created_at text not null,
+          updated_at text not null
+        );
+        """
+    )
     conn.commit()
 
 

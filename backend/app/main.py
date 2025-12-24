@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import claude, events, health, jobs, status
+# Load .env file from backend directory
+_backend_dir = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_dir / ".env")
+
+from app.api import calendar, claude, events, health, jobs, status
 from app.core.config import ensure_dirs
 from app.core.logging import configure_logging
 from app.db.connection import close_db, connect_db
@@ -17,11 +24,28 @@ def create_app() -> FastAPI:
     ensure_dirs()
 
     app = FastAPI(title="Enttok Backend", version="0.1.0")
+
+    # CORS middleware for Electron app (localhost dev server)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "app://.",  # Electron production
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.include_router(health.router)
     app.include_router(status.router)
     app.include_router(jobs.router)
     app.include_router(claude.router)
     app.include_router(events.router)
+    app.include_router(calendar.router)
 
     @app.on_event("startup")
     async def on_startup() -> None:

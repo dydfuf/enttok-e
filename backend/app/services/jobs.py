@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from app.core.config import BACKEND_WORKERS
 from app.db import jobs_repo
+from app.services.calendar import run_calendar_sync_job
 from app.services.claude import run_claude_job
 from app.websocket.manager import manager
 
@@ -30,6 +31,10 @@ async def process_job(job_id: str) -> None:
 
     if job["type"] == "claude.spawn":
         await run_claude_job(job_id, job.get("payload", {}))
+        return
+
+    if job["type"] == "connector.calendar.sync":
+        await run_calendar_sync_job(job_id, job.get("payload", {}))
         return
 
     await jobs_repo.update_job(job_id, status="running", progress=0.0)
