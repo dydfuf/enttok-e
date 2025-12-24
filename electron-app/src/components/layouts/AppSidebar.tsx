@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Calendar,
+  CalendarDays,
   FileText,
   Search,
   Tag,
@@ -20,6 +21,7 @@ import {
 
 const navItems = [
   { to: "/daily", label: "Today", icon: Calendar },
+  { to: "/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/notes", label: "Notes", icon: FileText },
   { to: "/search", label: "Search", icon: Search },
   { to: "/tags", label: "Tags", icon: Tag },

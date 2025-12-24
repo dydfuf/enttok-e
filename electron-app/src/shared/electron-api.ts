@@ -131,6 +131,7 @@ export type ElectronAPI = {
   receive: (channel: string, func: (...args: unknown[]) => void) => void;
   readFile: (filePath: string) => Promise<FileResult>;
   writeFile: (filePath: string, content: string) => Promise<FileResult>;
+  writeBinaryFile: (filePath: string, base64: string) => Promise<FileResult>;
   openFileDialog: () => Promise<OpenDialogResult | null>;
   saveFileDialog: (defaultPath?: string) => Promise<SaveDialogResult>;
   selectVaultFolder: () => Promise<SelectFolderResult>;

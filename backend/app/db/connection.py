@@ -60,6 +60,71 @@ def init_db(conn: sqlite3.Connection) -> None:
         );
         """
     )
+    conn.execute(
+        """
+        create table if not exists calendar_calendars (
+          account_id text not null,
+          calendar_id text not null,
+          provider text not null,
+          name text,
+          description text,
+          is_primary integer default 0,
+          access_role text,
+          background_color text,
+          foreground_color text,
+          time_zone text,
+          selected integer default 1,
+          created_at text not null,
+          updated_at text not null,
+          primary key (account_id, calendar_id)
+        );
+        """
+    )
+    conn.execute(
+        """
+        create table if not exists calendar_events (
+          account_id text not null,
+          calendar_id text not null,
+          event_id text not null,
+          title text,
+          description text,
+          start_time text,
+          end_time text,
+          start_ts integer,
+          end_ts integer,
+          all_day integer default 0,
+          location text,
+          conference_url text,
+          visibility text,
+          status text,
+          organizer_json text,
+          attendees_json text,
+          html_link text,
+          time_zone text,
+          created_at text,
+          updated_at text,
+          primary key (account_id, calendar_id, event_id)
+        );
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_calendar_events_range
+        on calendar_events (start_ts, end_ts);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_calendar_events_calendar
+        on calendar_events (account_id, calendar_id);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_calendar_calendars_selected
+        on calendar_calendars (account_id, selected);
+        """
+    )
     conn.commit()
 
 
@@ -86,9 +151,22 @@ async def execute(query: str, params: tuple[Any, ...] = ()) -> None:
         await asyncio.to_thread(_execute_sync, query, params)
 
 
+async def executemany(query: str, params: list[tuple[Any, ...]]) -> None:
+    if not params:
+        return
+    async with db_lock:
+        await asyncio.to_thread(_executemany_sync, query, params)
+
+
 def _execute_sync(query: str, params: tuple[Any, ...]) -> None:
     conn = _ensure_conn()
     conn.execute(query, params)
+    conn.commit()
+
+
+def _executemany_sync(query: str, params: list[tuple[Any, ...]]) -> None:
+    conn = _ensure_conn()
+    conn.executemany(query, params)
     conn.commit()
 
 

@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import {
   readFile,
   writeFile,
+  writeBinaryFile,
   showOpenDialog,
   showSaveDialog,
   showSelectFolderDialog,
@@ -33,6 +34,9 @@ export function registerIpcHandlers() {
   ipcMain.handle("file:read", (_, filePath: string) => readFile(filePath));
   ipcMain.handle("file:write", (_, filePath: string, content: string) =>
     writeFile(filePath, content)
+  );
+  ipcMain.handle("file:write-binary", (_, filePath: string, base64: string) =>
+    writeBinaryFile(filePath, base64)
   );
   ipcMain.handle("file:open-dialog", () => showOpenDialog());
   ipcMain.handle("file:save-dialog", (_, defaultPath?: string) =>

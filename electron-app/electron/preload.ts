@@ -20,6 +20,8 @@ const api: ElectronAPI = {
   readFile: (filePath: string) => ipcRenderer.invoke("file:read", filePath),
   writeFile: (filePath: string, content: string) =>
     ipcRenderer.invoke("file:write", filePath, content),
+  writeBinaryFile: (filePath: string, base64: string) =>
+    ipcRenderer.invoke("file:write-binary", filePath, base64),
   openFileDialog: () => ipcRenderer.invoke("file:open-dialog"),
   saveFileDialog: (defaultPath?: string) =>
     ipcRenderer.invoke("file:save-dialog", defaultPath),

@@ -36,6 +36,59 @@ export type AccountsResponse = {
 	accounts: CalendarAccount[];
 };
 
+export type CalendarListItem = {
+	account_id: string;
+	calendar_id: string;
+	provider: CalendarProvider;
+	name: string;
+	description?: string;
+	is_primary: boolean;
+	access_role?: string;
+	background_color?: string;
+	foreground_color?: string;
+	time_zone?: string;
+	selected: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+export type CalendarsResponse = {
+	calendars: CalendarListItem[];
+};
+
+export type CalendarEvent = {
+	account_id: string;
+	event_id: string;
+	calendar_id: string;
+	title: string;
+	description?: string;
+	start_time: string;
+	end_time: string;
+	start_ts: number;
+	end_ts: number;
+	all_day: boolean;
+	location?: string;
+	conference_url?: string;
+	visibility?: string;
+	status: string;
+	organizer?: { email?: string; displayName?: string };
+	attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>;
+	html_link?: string;
+	time_zone?: string;
+	created_at: string;
+	updated_at: string;
+	calendar_color?: string;
+	calendar_name?: string;
+};
+
+export type EventsResponse = {
+	events: CalendarEvent[];
+};
+
+export type CalendarSelectionUpdate = {
+	selected: boolean;
+};
+
 export type SyncResponse = {
 	job_id: string;
 	status: string;
@@ -94,6 +147,96 @@ export async function fetchAccounts(
 	}
 	const data: AccountsResponse = await res.json();
 	return data.accounts;
+}
+
+export async function fetchCalendars(
+	port: number,
+	token: string,
+	options: {
+		account_id?: string;
+		selected_only?: boolean;
+	} = {},
+): Promise<CalendarListItem[]> {
+	const params = new URLSearchParams();
+	if (options.account_id) {
+		params.set("account_id", options.account_id);
+	}
+	if (options.selected_only !== undefined) {
+		params.set("selected_only", String(options.selected_only));
+	}
+
+	const query = params.toString();
+	const res = await fetch(
+		buildApiUrl(port, `/calendar/calendars${query ? `?${query}` : ""}`),
+		{
+			method: "GET",
+			headers: buildHeaders(token),
+		},
+	);
+	if (!res.ok) {
+		throw new Error(`Failed to fetch calendars: ${res.status}`);
+	}
+	const data: CalendarsResponse = await res.json();
+	return data.calendars;
+}
+
+export async function fetchEvents(
+	port: number,
+	token: string,
+	options: {
+		start: string;
+		end: string;
+		account_id?: string;
+		calendar_ids?: string[];
+		selected_only?: boolean;
+	},
+): Promise<CalendarEvent[]> {
+	const params = new URLSearchParams();
+	params.set("start", options.start);
+	params.set("end", options.end);
+	if (options.account_id) {
+		params.set("account_id", options.account_id);
+	}
+	if (options.calendar_ids?.length) {
+		params.set("calendar_ids", options.calendar_ids.join(","));
+	}
+	if (options.selected_only !== undefined) {
+		params.set("selected_only", String(options.selected_only));
+	}
+
+	const res = await fetch(
+		buildApiUrl(port, `/calendar/events?${params.toString()}`),
+		{
+			method: "GET",
+			headers: buildHeaders(token),
+		},
+	);
+	if (!res.ok) {
+		throw new Error(`Failed to fetch events: ${res.status}`);
+	}
+	const data: EventsResponse = await res.json();
+	return data.events;
+}
+
+export async function updateCalendarSelection(
+	port: number,
+	token: string,
+	accountId: string,
+	calendarId: string,
+	selected: boolean,
+): Promise<void> {
+	const payload: CalendarSelectionUpdate = { selected };
+	const res = await fetch(
+		buildApiUrl(port, `/calendar/calendars/${accountId}/${calendarId}`),
+		{
+			method: "PATCH",
+			headers: buildHeaders(token),
+			body: JSON.stringify(payload),
+		},
+	);
+	if (!res.ok) {
+		throw new Error(`Failed to update calendar selection: ${res.status}`);
+	}
 }
 
 export async function createAccount(

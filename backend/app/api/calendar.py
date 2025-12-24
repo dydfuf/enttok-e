@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
@@ -8,6 +10,11 @@ from app.schemas.calendar import (
     CalendarAccount,
     CalendarAccountCreate,
     CalendarAccountsResponse,
+    CalendarEvent,
+    CalendarEventsResponse,
+    CalendarListItem,
+    CalendarListResponse,
+    CalendarSelectionUpdate,
     CalendarProvider,
     CalendarProviderInfo,
     OAuthCallbackRequest,
@@ -23,6 +30,7 @@ from app.services.google_oauth import (
     start_oauth_flow,
     SCOPES,
 )
+from app.utils.time import parse_iso_to_epoch
 from app.services.jobs import enqueue_job
 
 router = APIRouter(prefix="/calendar")
@@ -44,6 +52,14 @@ SUPPORTED_PROVIDERS: list[CalendarProviderInfo] = [
         notes="Use CalDAV endpoint with app-specific passwords; relies on sync tokens.",
     ),
 ]
+
+
+def _compute_expires_at(expires_in: int | None) -> str | None:
+    if not expires_in:
+        return None
+    return (
+        datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    ).isoformat().replace("+00:00", "Z")
 
 
 @router.get("/providers", response_model=ProvidersResponse)
@@ -89,6 +105,64 @@ async def delete_account(account_id: str, _: None = Depends(verify_token)) -> di
         raise HTTPException(status_code=404, detail="calendar account not found")
     await calendar_repo.delete_account(account_id)
     return {"ok": True}
+
+
+@router.get("/calendars", response_model=CalendarListResponse)
+async def list_calendars(
+    account_id: str | None = None,
+    selected_only: bool = True,
+    _: None = Depends(verify_token),
+) -> CalendarListResponse:
+    calendars = await calendar_repo.list_calendars(
+        account_id=account_id, selected_only=selected_only
+    )
+    return CalendarListResponse(
+        calendars=[CalendarListItem(**calendar) for calendar in calendars]
+    )
+
+
+@router.patch("/calendars/{account_id}/{calendar_id}")
+async def update_calendar_selection(
+    account_id: str,
+    calendar_id: str,
+    payload: CalendarSelectionUpdate,
+    _: None = Depends(verify_token),
+) -> dict:
+    account = await calendar_repo.fetch_account(account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="calendar account not found")
+    await calendar_repo.set_calendar_selected(account_id, calendar_id, payload.selected)
+    return {"ok": True}
+
+
+@router.get("/events", response_model=CalendarEventsResponse)
+async def list_events(
+    start: str,
+    end: str,
+    account_id: str | None = None,
+    calendar_ids: str | None = None,
+    selected_only: bool = True,
+    _: None = Depends(verify_token),
+) -> CalendarEventsResponse:
+    try:
+        start_ts = parse_iso_to_epoch(start)
+        end_ts = parse_iso_to_epoch(end)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if start_ts > end_ts:
+        raise HTTPException(status_code=400, detail="start must be before end")
+
+    calendar_id_list = (
+        [value for value in calendar_ids.split(",") if value] if calendar_ids else None
+    )
+    events = await calendar_repo.list_events(
+        start_ts=start_ts,
+        end_ts=end_ts,
+        account_id=account_id,
+        calendar_ids=calendar_id_list,
+        selected_only=selected_only,
+    )
+    return CalendarEventsResponse(events=[CalendarEvent(**event) for event in events])
 
 
 @router.post("/accounts/{account_id}/sync")
@@ -220,6 +294,7 @@ async def google_oauth_callback(
             "access_token": tokens["access_token"],
             "refresh_token": tokens.get("refresh_token"),
             "expires_in": tokens.get("expires_in"),
+            "expires_at": _compute_expires_at(tokens.get("expires_in")),
         }
 
         # Create calendar account
@@ -299,6 +374,7 @@ async def complete_google_oauth(
         "access_token": tokens["access_token"],
         "refresh_token": tokens.get("refresh_token"),
         "expires_in": tokens.get("expires_in"),
+        "expires_at": _compute_expires_at(tokens.get("expires_in")),
     }
 
     # Create calendar account

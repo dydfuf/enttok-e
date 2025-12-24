@@ -53,6 +53,23 @@ export async function writeFile(
   }
 }
 
+export async function writeBinaryFile(
+  filePath: string,
+  base64Data: string
+): Promise<FileResult> {
+  try {
+    await mkdir(path.dirname(filePath), { recursive: true });
+    const buffer = Buffer.from(base64Data, "base64");
+    await fsWriteFile(filePath, buffer);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to write file",
+    };
+  }
+}
+
 export async function showOpenDialog(): Promise<OpenDialogResult | null> {
   const window = BrowserWindow.getFocusedWindow();
   const result = await dialog.showOpenDialog(window!, {

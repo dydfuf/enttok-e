@@ -4,6 +4,7 @@ import { FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditorLayout } from "@/components/editor/EditorLayout";
 import { DailyHeader } from "@/components/daily/DailyHeader";
+import { DailyCalendarSection } from "@/components/daily/DailyCalendarSection";
 
 type DailyNotePageProps = {
   date: Date;
@@ -101,12 +102,13 @@ export function DailyNotePage({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-6 pt-6">
+      <div className="px-6 pt-6 space-y-4">
         <DailyHeader
           date={date}
           datesWithNotes={datesWithNotes}
           onNavigate={onNavigate}
         />
+        <DailyCalendarSection date={date} />
       </div>
       <div className="flex-1 overflow-hidden">
         <EditorLayout initialFilePath={filePath} className="h-full" />
