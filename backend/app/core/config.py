@@ -10,6 +10,12 @@ SESSION_OUTPUT_LINES = int(os.environ.get("CLAUDE_SESSION_OUTPUT_LINES", "200"))
 
 DB_PATH = os.path.join(APP_DATA_DIR, "index.db")
 
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_PORT_MIN = int(os.environ.get("GOOGLE_REDIRECT_PORT_MIN", "49800"))
+GOOGLE_REDIRECT_PORT_MAX = int(os.environ.get("GOOGLE_REDIRECT_PORT_MAX", "49899"))
+
 
 def ensure_dirs() -> None:
     os.makedirs(APP_DATA_DIR, exist_ok=True)

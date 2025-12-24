@@ -24,6 +24,7 @@ import { Route as AppDailyIndexRouteImport } from './routes/_app/daily.index'
 import { Route as AppTagsTagRouteImport } from './routes/_app/tags/$tag'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes/$noteId'
 import { Route as AppIntegrationsGithubRouteImport } from './routes/_app/integrations/github'
+import { Route as AppIntegrationsCalendarRouteImport } from './routes/_app/integrations/calendar'
 import { Route as AppDailyDateRouteImport } from './routes/_app/daily.$date'
 
 const AppRoute = AppRouteImport.update({
@@ -100,6 +101,11 @@ const AppIntegrationsGithubRoute = AppIntegrationsGithubRouteImport.update({
   path: '/github',
   getParentRoute: () => AppIntegrationsRoute,
 } as any)
+const AppIntegrationsCalendarRoute = AppIntegrationsCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => AppIntegrationsRoute,
+} as any)
 const AppDailyDateRoute = AppDailyDateRouteImport.update({
   id: '/$date',
   path: '/$date',
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/tags': typeof AppTagsRouteWithChildren
   '/daily/$date': typeof AppDailyDateRoute
+  '/integrations/calendar': typeof AppIntegrationsCalendarRoute
   '/integrations/github': typeof AppIntegrationsGithubRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/tags/$tag': typeof AppTagsTagRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/search': typeof AppSearchRoute
   '/settings': typeof AppSettingsRoute
   '/daily/$date': typeof AppDailyDateRoute
+  '/integrations/calendar': typeof AppIntegrationsCalendarRoute
   '/integrations/github': typeof AppIntegrationsGithubRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/tags/$tag': typeof AppTagsTagRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/tags': typeof AppTagsRouteWithChildren
   '/_app/daily/$date': typeof AppDailyDateRoute
+  '/_app/integrations/calendar': typeof AppIntegrationsCalendarRoute
   '/_app/integrations/github': typeof AppIntegrationsGithubRoute
   '/_app/notes/$noteId': typeof AppNotesNoteIdRoute
   '/_app/tags/$tag': typeof AppTagsTagRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tags'
     | '/daily/$date'
+    | '/integrations/calendar'
     | '/integrations/github'
     | '/notes/$noteId'
     | '/tags/$tag'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/daily/$date'
+    | '/integrations/calendar'
     | '/integrations/github'
     | '/notes/$noteId'
     | '/tags/$tag'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/tags'
     | '/_app/daily/$date'
+    | '/_app/integrations/calendar'
     | '/_app/integrations/github'
     | '/_app/notes/$noteId'
     | '/_app/tags/$tag'
@@ -318,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIntegrationsGithubRouteImport
       parentRoute: typeof AppIntegrationsRoute
     }
+    '/_app/integrations/calendar': {
+      id: '/_app/integrations/calendar'
+      path: '/calendar'
+      fullPath: '/integrations/calendar'
+      preLoaderRoute: typeof AppIntegrationsCalendarRouteImport
+      parentRoute: typeof AppIntegrationsRoute
+    }
     '/_app/daily/$date': {
       id: '/_app/daily/$date'
       path: '/$date'
@@ -343,11 +362,13 @@ const AppDailyRouteWithChildren = AppDailyRoute._addFileChildren(
 )
 
 interface AppIntegrationsRouteChildren {
+  AppIntegrationsCalendarRoute: typeof AppIntegrationsCalendarRoute
   AppIntegrationsGithubRoute: typeof AppIntegrationsGithubRoute
   AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
 }
 
 const AppIntegrationsRouteChildren: AppIntegrationsRouteChildren = {
+  AppIntegrationsCalendarRoute: AppIntegrationsCalendarRoute,
   AppIntegrationsGithubRoute: AppIntegrationsGithubRoute,
   AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,
 }

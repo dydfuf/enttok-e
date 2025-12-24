@@ -114,3 +114,19 @@ async def update_sync_state(account_id: str, cursor: Optional[str]) -> str:
         (_connector_key(account_id), cursor, last_sync_at),
     )
     return last_sync_at
+
+
+async def update_credentials(
+    account_id: str,
+    credentials: Dict[str, Any],
+) -> None:
+    """Update stored credentials for an account (e.g., after token refresh)."""
+    now = utc_now()
+    await execute(
+        """
+        update calendar_accounts
+        set credentials_json = ?, updated_at = ?
+        where account_id = ?
+        """,
+        (json.dumps(credentials), now, account_id),
+    )

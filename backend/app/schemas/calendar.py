@@ -49,3 +49,38 @@ class CalendarAccountsResponse(BaseModel):
 
 class ProvidersResponse(BaseModel):
     providers: List[CalendarProviderInfo]
+
+
+# OAuth Flow Schemas
+class OAuthStartResponse(BaseModel):
+    auth_url: str
+    state: str
+    redirect_uri: str
+    port: int
+
+
+class OAuthCallbackRequest(BaseModel):
+    code: str
+    state: str
+
+
+class OAuthCompleteResponse(BaseModel):
+    account: CalendarAccount
+    success: bool
+    message: str
+
+
+# Calendar Event Schema
+class CalendarEvent(BaseModel):
+    event_id: str
+    calendar_id: str
+    title: str
+    description: Optional[str] = None
+    start_time: str
+    end_time: str
+    all_day: bool = False
+    location: Optional[str] = None
+    recurring: bool = False
+    status: str  # "confirmed", "tentative", "cancelled"
+    created_at: str
+    updated_at: str
