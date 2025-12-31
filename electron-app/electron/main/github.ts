@@ -10,8 +10,10 @@ export type GitHubCliStatus = {
 };
 
 export type GitHubAuthHost = {
-  user: string;
+  login: string;
   active: boolean;
+  state: string;
+  error?: string;
 };
 
 export type GitHubAuthStatus = {
@@ -252,27 +254,39 @@ export async function checkGitHubAuth(): Promise<GitHubAuthStatus> {
 
   const hosts = result.data.hosts || {};
   const githubComUsers = hosts["github.com"] || [];
-  const activeGithubComUser = githubComUsers.find((h) => h.active);
+  const activeGithubComUser = githubComUsers.find(
+    (h) => h.active && h.state !== "error"
+  );
 
   if (activeGithubComUser) {
     return {
       authenticated: true,
-      username: activeGithubComUser.user,
+      username: activeGithubComUser.login,
       hostname: "github.com",
       error: null,
     };
   }
 
   for (const [hostname, users] of Object.entries(hosts)) {
-    const activeUser = users.find((u) => u.active);
+    const activeUser = users.find((u) => u.active && u.state !== "error");
     if (activeUser) {
       return {
         authenticated: true,
-        username: activeUser.user,
+        username: activeUser.login,
         hostname,
         error: null,
       };
     }
+  }
+
+  const errorHost = githubComUsers.find((h) => h.active && h.state === "error");
+  if (errorHost) {
+    return {
+      authenticated: false,
+      username: errorHost.login,
+      hostname: "github.com",
+      error: errorHost.error || "Authentication error",
+    };
   }
 
   return {

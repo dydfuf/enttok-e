@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "@tanstack/react-router";
+import { format, parseISO, isToday } from "date-fns";
 import { Github, Lightbulb, Loader2, RefreshCw } from "lucide-react";
 import {
 	Sidebar,
@@ -48,21 +50,42 @@ function extractOutput(job: ClaudeJobRecord) {
 }
 
 function GitHubActivityCard() {
+  const location = useLocation();
   const { status, summary, loading, refreshSummary } = useGitHub();
-  const [hasFetched, setHasFetched] = useState(false);
+  const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null);
 
   const isConnected = status?.cli.found && status?.auth.authenticated;
 
-  useEffect(() => {
-    if (isConnected && !hasFetched && !loading) {
-      refreshSummary();
-      setHasFetched(true);
+  const { currentDate, isDailyPage } = useMemo(() => {
+    const dailyDateMatch = location.pathname.match(/^\/daily\/(\d{4}-\d{2}-\d{2})$/);
+    if (dailyDateMatch) {
+      return { currentDate: dailyDateMatch[1], isDailyPage: true };
     }
-  }, [isConnected, hasFetched, loading, refreshSummary]);
+    if (location.pathname === "/daily" || location.pathname === "/daily/") {
+      return { currentDate: format(new Date(), "yyyy-MM-dd"), isDailyPage: true };
+    }
+    return { currentDate: format(new Date(), "yyyy-MM-dd"), isDailyPage: false };
+  }, [location.pathname]);
+
+  const label = useMemo(() => {
+    const dateToShow = summary?.date ?? currentDate;
+    const d = parseISO(dateToShow);
+    if (isToday(d)) {
+      return isDailyPage ? "Today's GitHub" : `${format(d, "MMM d")} GitHub`;
+    }
+    return `${format(d, "MMM d")} GitHub`;
+  }, [summary?.date, currentDate, isDailyPage]);
+
+  useEffect(() => {
+    if (isConnected && !loading && currentDate !== lastFetchedDate) {
+      refreshSummary(currentDate);
+      setLastFetchedDate(currentDate);
+    }
+  }, [isConnected, loading, currentDate, lastFetchedDate, refreshSummary]);
 
   const handleRefresh = useCallback(() => {
-    refreshSummary();
-  }, [refreshSummary]);
+    refreshSummary(currentDate);
+  }, [refreshSummary, currentDate]);
 
   const handleInsert = useCallback(() => {
     if (!summary) return;
@@ -109,7 +132,14 @@ function GitHubActivityCard() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium">
           <Github className="size-4" />
-          <span>Today's GitHub</span>
+          <div className="flex flex-col">
+            <span>{label}</span>
+            {status?.auth.username != null && status.auth.username !== "" && (
+              <span className="text-[10px] text-muted-foreground font-normal">
+                @{status.auth.username}
+              </span>
+            )}
+          </div>
         </div>
         <Button
           variant="ghost"
@@ -126,7 +156,7 @@ function GitHubActivityCard() {
         <div className="mt-2 text-xs text-muted-foreground">Loading...</div>
       ) : !hasActivity ? (
         <div className="mt-2 text-xs text-muted-foreground">
-          No activity found for today
+          No activity found for this date
         </div>
       ) : (
         <>

@@ -32,9 +32,10 @@ function IntegrationsIndexPage() {
 		{
 			id: "github",
 			name: "GitHub",
-			description: isGitHubConnected
-				? `Connected as @${status?.auth.username}`
-				: "Sync PRs, issues, commits, and reviews",
+			description:
+				isGitHubConnected && status?.auth.username
+					? `Connected as @${status.auth.username}`
+					: "Sync PRs, issues, commits, and reviews",
 			icon: Github,
 			connected: isGitHubConnected,
 			route: "/integrations/github",
