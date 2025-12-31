@@ -317,7 +317,8 @@ export function requestBackendJson(
   requestPath: string,
   body?: Record<string, unknown>
 ) {
-  if (!backendState.port || !backendState.token) {
+  const { port, token } = backendState;
+  if (!port || !token) {
     return Promise.reject(new Error("backend not running"));
   }
 
@@ -327,12 +328,12 @@ export function requestBackendJson(
     const req = http.request(
       {
         hostname: "127.0.0.1",
-        port: backendState.port,
+        port,
         path: requestPath,
         method,
         headers: {
           "Content-Type": "application/json",
-          "X-Backend-Token": backendState.token,
+          "X-Backend-Token": token,
           ...(payload ? { "Content-Length": Buffer.byteLength(payload) } : {}),
         },
       },

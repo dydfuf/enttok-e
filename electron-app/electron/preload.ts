@@ -3,6 +3,8 @@ import type {
   BackendLog,
   BackendState,
   ElectronAPI,
+  GitHubDailySummary,
+  GitHubStatus,
   RuntimeStatus,
 } from "../src/shared/electron-api";
 
@@ -90,11 +92,15 @@ const api: ElectronAPI = {
     };
   },
 
-  // Claude spawn API
   spawnClaude: (payload: Record<string, unknown>) =>
     ipcRenderer.invoke("claude:spawn", payload),
   createClaudeSession: () => ipcRenderer.invoke("claude:session"),
   getJob: (jobId: string) => ipcRenderer.invoke("backend:job", jobId),
+
+  getGitHubStatus: () =>
+    ipcRenderer.invoke("github:status") as Promise<GitHubStatus>,
+  getGitHubDailySummary: (date?: string) =>
+    ipcRenderer.invoke("github:daily-summary", date) as Promise<GitHubDailySummary>,
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Lightbulb, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Github, Lightbulb, Loader2, RefreshCw } from "lucide-react";
 import {
 	Sidebar,
 	SidebarContent,
@@ -17,6 +17,8 @@ import type {
 	ElectronAPI,
 } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
+import { useGitHub } from "@/contexts/GitHubContext";
+import { formatGitHubAsMarkdown } from "@/lib/github-formatter";
 
 type SuggestionItem = {
 	id: string;
@@ -43,6 +45,119 @@ function extractOutput(job: ClaudeJobRecord) {
 		return job.error.message;
 	}
 	return null;
+}
+
+function GitHubActivityCard() {
+  const { status, summary, loading, refreshSummary } = useGitHub();
+  const [hasFetched, setHasFetched] = useState(false);
+
+  const isConnected = status?.cli.found && status?.auth.authenticated;
+
+  useEffect(() => {
+    if (isConnected && !hasFetched && !loading) {
+      refreshSummary();
+      setHasFetched(true);
+    }
+  }, [isConnected, hasFetched, loading, refreshSummary]);
+
+  const handleRefresh = useCallback(() => {
+    refreshSummary();
+  }, [refreshSummary]);
+
+  const handleInsert = useCallback(() => {
+    if (!summary) return;
+    const markdown = formatGitHubAsMarkdown(summary);
+    if (!markdown.trim()) return;
+    window.dispatchEvent(
+      new CustomEvent("suggestion:apply", { detail: { text: markdown } })
+    );
+  }, [summary]);
+
+  const handleCopy = useCallback(async () => {
+    if (!summary) return;
+    const markdown = formatGitHubAsMarkdown(summary);
+    if (!markdown.trim()) return;
+    try {
+      await navigator.clipboard.writeText(markdown);
+    } catch {
+      // ignore
+    }
+  }, [summary]);
+
+  if (!isConnected) {
+    return (
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 p-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Github className="size-4" />
+          <span>GitHub not connected</span>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Go to Integrations → GitHub to connect
+        </p>
+      </div>
+    );
+  }
+
+  const hasActivity =
+    summary &&
+    (summary.prs.authored.length > 0 ||
+      summary.prs.reviewed.length > 0 ||
+      summary.commits.length > 0);
+
+  return (
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-medium">
+          <Github className="size-4" />
+          <span>Today's GitHub</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
+          <RefreshCw className={cn("size-3", loading && "animate-spin")} />
+        </Button>
+      </div>
+
+      {loading && !summary ? (
+        <div className="mt-2 text-xs text-muted-foreground">Loading...</div>
+      ) : !hasActivity ? (
+        <div className="mt-2 text-xs text-muted-foreground">
+          No activity found for today
+        </div>
+      ) : (
+        <>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            {summary.prs.authored.length > 0 && (
+              <div>{summary.prs.authored.length} PR(s) authored</div>
+            )}
+            {summary.prs.reviewed.length > 0 && (
+              <div>{summary.prs.reviewed.length} PR(s) reviewed</div>
+            )}
+            {summary.commits.length > 0 && (
+              <div>{summary.commits.length} commit(s)</div>
+            )}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={handleCopy}
+            >
+              Copy
+            </Button>
+            <Button size="sm" className="flex-1" onClick={handleInsert}>
+              Insert
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function SuggestionSidebar() {
@@ -220,6 +335,7 @@ export default function SuggestionSidebar() {
 							Session: {sessionId ?? "not started"}
 						</div>
 					</div>
+					<GitHubActivityCard />
 					<div className="mt-4 space-y-3">
 						{suggestions.length === 0 ? (
 							<div className="text-xs text-muted-foreground text-center py-3">

@@ -30,6 +30,10 @@ import {
   stopBackend,
 } from "./backend.js";
 import { getRuntimeStatus, refreshRuntimeStatus } from "./runtime.js";
+import {
+  getGitHubStatus,
+  getGitHubDailySummary,
+} from "./github.js";
 
 export function registerIpcHandlers() {
   // IPC Handlers for file operations
@@ -112,5 +116,10 @@ export function registerIpcHandlers() {
   );
   ipcMain.handle("claude:session", async () =>
     requestBackendJson("POST", "/claude/session")
+  );
+
+  ipcMain.handle("github:status", () => getGitHubStatus());
+  ipcMain.handle("github:daily-summary", (_event, date?: string) =>
+    getGitHubDailySummary(date)
   );
 }

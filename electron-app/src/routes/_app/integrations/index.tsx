@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CalendarDays, Github, Slack, SquareKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -6,48 +7,56 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { CalendarDays, Github, Slack, SquareKanban } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useGitHub } from "@/contexts/GitHubContext";
 
 export const Route = createFileRoute("/_app/integrations/")({
 	component: IntegrationsIndexPage,
 });
 
-const integrations = [
-	{
-		id: "calendar",
-		name: "Calendar",
-		description: "Sync events from Google Calendar or Apple Calendar",
-		icon: CalendarDays,
-		connected: false,
-		route: "/integrations/calendar",
-	},
-	{
-		id: "github",
-		name: "GitHub",
-		description: "Sync PRs, issues, commits, and reviews",
-		icon: Github,
-		connected: false,
-		route: "/integrations/github",
-	},
-	{
-		id: "slack",
-		name: "Slack",
-		description: "Coming soon - Sync messages and mentions",
-		icon: Slack,
-		connected: false,
-		disabled: true,
-	},
-	{
-		id: "jira",
-		name: "Jira",
-		description: "Coming soon - Sync issues and sprints",
-		icon: SquareKanban,
-		connected: false,
-		disabled: true,
-	},
-];
-
 function IntegrationsIndexPage() {
+	const { status } = useGitHub();
+
+	const isGitHubConnected =
+		status?.cli.found === true && status?.auth.authenticated === true;
+
+	const integrations = [
+		{
+			id: "calendar",
+			name: "Calendar",
+			description: "Sync events from Google Calendar or Apple Calendar",
+			icon: CalendarDays,
+			connected: false,
+			route: "/integrations/calendar",
+		},
+		{
+			id: "github",
+			name: "GitHub",
+			description: isGitHubConnected
+				? `Connected as @${status?.auth.username}`
+				: "Sync PRs, issues, commits, and reviews",
+			icon: Github,
+			connected: isGitHubConnected,
+			route: "/integrations/github",
+		},
+		{
+			id: "slack",
+			name: "Slack",
+			description: "Coming soon - Sync messages and mentions",
+			icon: Slack,
+			connected: false,
+			disabled: true,
+		},
+		{
+			id: "jira",
+			name: "Jira",
+			description: "Coming soon - Sync issues and sprints",
+			icon: SquareKanban,
+			connected: false,
+			disabled: true,
+		},
+	];
+
 	return (
 		<div className="min-h-full p-6">
 			<div className="max-w-3xl mx-auto">
@@ -72,9 +81,19 @@ function IntegrationsIndexPage() {
 									<div className="flex items-center gap-4">
 										<Icon className="w-8 h-8 text-muted-foreground" />
 										<div className="flex-1">
-											<CardTitle className="text-base">
-												{integration.name}
-											</CardTitle>
+											<div className="flex items-center gap-2">
+												<CardTitle className="text-base">
+													{integration.name}
+												</CardTitle>
+												{integration.connected && (
+													<Badge
+														variant="secondary"
+														className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+													>
+														Connected
+													</Badge>
+												)}
+											</div>
 											<CardDescription>
 												{integration.description}
 											</CardDescription>

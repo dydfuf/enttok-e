@@ -126,6 +126,58 @@ export type ClaudeJobRecord = {
   } | null;
 };
 
+export type GitHubCliStatus = {
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  error: string | null;
+};
+
+export type GitHubAuthStatus = {
+  authenticated: boolean;
+  username: string | null;
+  hostname: string;
+  error: string | null;
+};
+
+export type GitHubStatus = {
+  cli: GitHubCliStatus;
+  auth: GitHubAuthStatus;
+};
+
+export type GitHubPR = {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  repository: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GitHubCommit = {
+  sha: string;
+  message: string;
+  repository: string;
+  url: string;
+  createdAt: string;
+};
+
+export type GitHubDailySummary = {
+  date: string;
+  username: string | null;
+  prs: {
+    authored: GitHubPR[];
+    reviewed: GitHubPR[];
+  };
+  commits: GitHubCommit[];
+  stats: {
+    totalPRsAuthored: number;
+    totalPRsReviewed: number;
+    totalCommits: number;
+  };
+};
+
 export type ElectronAPI = {
   send: (channel: string, data: unknown) => void;
   receive: (channel: string, func: (...args: unknown[]) => void) => void;
@@ -162,4 +214,6 @@ export type ElectronAPI = {
   spawnClaude: (payload: Record<string, unknown>) => Promise<ClaudeJobResponse>;
   createClaudeSession: () => Promise<ClaudeSessionResponse>;
   getJob: (jobId: string) => Promise<ClaudeJobRecord>;
+  getGitHubStatus: () => Promise<GitHubStatus>;
+  getGitHubDailySummary: (date?: string) => Promise<GitHubDailySummary>;
 };
