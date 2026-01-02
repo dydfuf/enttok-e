@@ -8,11 +8,17 @@ import { cn } from "@/lib/utils";
 interface EditorLayoutProps {
   initialFilePath?: string;
   className?: string;
+  hideToolbar?: boolean;
+  onDirtyChange?: (isDirty: boolean) => void;
+  onSaveRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 export function EditorLayout({
   initialFilePath,
   className,
+  hideToolbar = false,
+  onDirtyChange,
+  onSaveRef,
 }: EditorLayoutProps) {
   const {
     filePath,
@@ -37,6 +43,18 @@ export function EditorLayout({
   useEffect(() => {
     filePathRef.current = filePath;
   }, [filePath]);
+
+  // Expose save function to parent
+  useEffect(() => {
+    if (onSaveRef) {
+      onSaveRef.current = saveFile;
+    }
+  }, [onSaveRef, saveFile]);
+
+  // Notify parent of dirty state changes
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   // Auto-save functionality
   useAutoSave({
@@ -79,14 +97,16 @@ export function EditorLayout({
   return (
     <div className={cn("flex h-full flex-col", className)}>
       {/* Toolbar */}
-      <EditorToolbar
-        onNew={createNewFile}
-        onOpen={openFile}
-        onSave={saveFile}
-        isDirty={isDirty}
-        isLoading={isLoading}
-        filePath={filePath}
-      />
+      {!hideToolbar && (
+        <EditorToolbar
+          onNew={createNewFile}
+          onOpen={openFile}
+          onSave={saveFile}
+          isDirty={isDirty}
+          isLoading={isLoading}
+          filePath={filePath}
+        />
+      )}
 
       {/* Error display */}
       {error && (

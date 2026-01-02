@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { format, parseISO, isToday } from "date-fns";
-import { Github, Lightbulb, Loader2, RefreshCw } from "lucide-react";
+import { Github, Lightbulb, Loader2, RefreshCw, Sparkles, History } from "lucide-react";
 import {
 	Sidebar,
 	SidebarContent,
@@ -21,6 +21,7 @@ import type {
 import { getElectronAPI } from "@/lib/electron";
 import { useGitHub } from "@/contexts/GitHubContext";
 import { formatGitHubAsMarkdown } from "@/lib/github-formatter";
+import { ActivityStream, type ActivityItemData } from "@/components/activity";
 
 type SuggestionItem = {
 	id: string;
@@ -48,6 +49,58 @@ function extractOutput(job: ClaudeJobRecord) {
 	}
 	return null;
 }
+
+// Sample activity data - will be replaced with real data from integrations
+const sampleActivities: ActivityItemData[] = [
+	{
+		id: "1",
+		title: "Product Sync",
+		description: "Weekly sync with product team regarding Q2 goals.",
+		source: "calendar",
+		sourceLabel: "Google Calendar",
+		time: "09:00",
+	},
+	{
+		id: "2",
+		title: "Re: Q1 Roadmap",
+		description: 'From: Sarah Jenkins • "Please review the attached doc..."',
+		source: "gmail",
+		sourceLabel: "Gmail",
+		time: "10:15",
+	},
+	{
+		id: "3",
+		title: "PROJ-124: In Progress",
+		description: "Updated status to In Progress.",
+		source: "jira",
+		sourceLabel: "Jira",
+		time: "11:30",
+	},
+	{
+		id: "4",
+		title: 'Edited: "API Specs v2"',
+		description: "Engineering Space • Minor corrections to endpoints.",
+		source: "confluence",
+		sourceLabel: "Confluence",
+		time: "13:45",
+	},
+	{
+		id: "5",
+		title: "Pushed 3 commits",
+		description: "main • fix/auth-token-refresh",
+		source: "github",
+		sourceLabel: "Github",
+		time: "14:20",
+	},
+	{
+		id: "6",
+		title: "Mentioned in #design",
+		description: 'Alex: "Can you check the new spacing?"',
+		source: "slack",
+		sourceLabel: "Slack",
+		time: "15:50",
+	},
+];
 
 function GitHubActivityCard() {
   const location = useLocation();
@@ -109,7 +162,7 @@ function GitHubActivityCard() {
 
   if (!isConnected) {
     return (
-      <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 p-3">
+      <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Github className="size-4" />
           <span>GitHub not connected</span>
@@ -128,7 +181,7 @@ function GitHubActivityCard() {
       summary.commits.length > 0);
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium">
           <Github className="size-4" />
@@ -190,7 +243,10 @@ function GitHubActivityCard() {
   );
 }
 
+type TabType = "suggestions" | "activity";
+
 export default function SuggestionSidebar() {
+	const [activeTab, setActiveTab] = useState<TabType>("activity");
 	const [prompt, setPrompt] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
@@ -320,110 +376,142 @@ export default function SuggestionSidebar() {
 		<Sidebar collapsible="icon" variant="sidebar" side="right">
 			<SidebarHeader className="h-12 flex-row items-center px-3">
 				<span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
-					Suggestions
+					Assistant
 				</span>
 			</SidebarHeader>
-			<SidebarContent>
-				<div className="flex-1 p-4 group-data-[collapsible=icon]:hidden">
-					<div className="text-sm text-muted-foreground text-center py-6">
-						<Lightbulb className="mx-auto mb-2 size-6 opacity-50" />
-						Generate a quick suggestion with Claude
-					</div>
-					<div className="space-y-3">
-						<Textarea
-							value={prompt}
-							onChange={(event) => setPrompt(event.target.value)}
-							placeholder="e.g., summarize today's work log in 3 bullets"
-							className="min-h-20"
-						/>
-						<div className="flex gap-2">
-							<Button
-								type="button"
-								className="flex-1"
-								onClick={handleSubmit}
-								disabled={isSubmitting || !prompt.trim()}
-							>
-								{isSubmitting ? (
-									<>
-										<Loader2 className="mr-2 size-4 animate-spin" />
-										Running
-									</>
-								) : (
-									"Generate"
-								)}
-							</Button>
-							<Button
-								type="button"
-								variant="secondary"
-								className="flex-1"
-								onClick={handleNewSession}
-							>
-								New Session
-							</Button>
-						</div>
-						<div className="text-[11px] text-muted-foreground">
-							Session: {sessionId ?? "not started"}
-						</div>
-					</div>
-					<GitHubActivityCard />
-					<div className="mt-4 space-y-3">
-						{suggestions.length === 0 ? (
-							<div className="text-xs text-muted-foreground text-center py-3">
-								No suggestions yet
-							</div>
-						) : (
-							suggestions.map((item) => (
-								<div
-									key={item.id}
-									className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/60 p-3"
-								>
-									<div className="flex items-center justify-between text-xs text-muted-foreground">
-										<span className="truncate max-w-[180px]">
-											{item.prompt}
-										</span>
-										<span
-											className={cn(
-												"text-[10px] uppercase",
-												item.status === "succeeded"
-													? "text-emerald-500"
-													: item.status === "failed"
-														? "text-red-500"
-														: "text-amber-500",
-											)}
-										>
-											{item.status}
-										</span>
-									</div>
-									<div className="mt-2 text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-200">
-										{item.output ?? item.error ?? "Waiting for response..."}
-									</div>
-									<div className="mt-3 flex gap-2">
-										<Button
-											type="button"
-											variant="secondary"
-											size="sm"
-											className="flex-1"
-											onClick={() => handleCopy(item.output ?? "")}
-											disabled={!item.output}
-										>
-											Copy
-										</Button>
-										<Button
-											type="button"
-											size="sm"
-											className="flex-1"
-											onClick={() => handleApply(item.output ?? "")}
-											disabled={!item.output}
-										>
-											Apply
-										</Button>
-									</div>
-								</div>
-							))
-						)}
-					</div>
-					<BackendStatusIndicator />
+			<SidebarContent className="group-data-[collapsible=icon]:hidden">
+				{/* Tab buttons */}
+				<div className="flex items-center gap-1 p-2 border-b border-border bg-muted/30">
+					<Button
+						variant={activeTab === "suggestions" ? "secondary" : "ghost"}
+						size="sm"
+						className="flex-1 gap-2"
+						onClick={() => setActiveTab("suggestions")}
+					>
+						<Sparkles className="size-4" />
+					</Button>
+					<Button
+						variant={activeTab === "activity" ? "secondary" : "ghost"}
+						size="sm"
+						className="flex-1 gap-2"
+						onClick={() => setActiveTab("activity")}
+					>
+						<History className="size-4" />
+					</Button>
 				</div>
+
+				{/* Suggestions Tab */}
+				{activeTab === "suggestions" && (
+					<div className="flex-1 p-4 overflow-y-auto">
+						<div className="text-sm text-muted-foreground text-center py-6">
+							<Lightbulb className="mx-auto mb-2 size-6 opacity-50" />
+							Generate a quick suggestion with Claude
+						</div>
+						<div className="space-y-3">
+							<Textarea
+								value={prompt}
+								onChange={(event) => setPrompt(event.target.value)}
+								placeholder="e.g., summarize today's work log in 3 bullets"
+								className="min-h-20"
+							/>
+							<div className="flex gap-2">
+								<Button
+									type="button"
+									className="flex-1"
+									onClick={handleSubmit}
+									disabled={isSubmitting || !prompt.trim()}
+								>
+									{isSubmitting ? (
+										<>
+											<Loader2 className="mr-2 size-4 animate-spin" />
+											Running
+										</>
+									) : (
+										"Generate"
+									)}
+								</Button>
+								<Button
+									type="button"
+									variant="secondary"
+									className="flex-1"
+									onClick={handleNewSession}
+								>
+									New Session
+								</Button>
+							</div>
+							<div className="text-[11px] text-muted-foreground">
+								Session: {sessionId ?? "not started"}
+							</div>
+						</div>
+						<div className="mt-4">
+							<GitHubActivityCard />
+						</div>
+						<div className="mt-4 space-y-3">
+							{suggestions.length === 0 ? (
+								<div className="text-xs text-muted-foreground text-center py-3">
+									No suggestions yet
+								</div>
+							) : (
+								suggestions.map((item) => (
+									<div
+										key={item.id}
+										className="rounded-lg border border-border bg-card p-3"
+									>
+										<div className="flex items-center justify-between text-xs text-muted-foreground">
+											<span className="truncate max-w-[180px]">
+												{item.prompt}
+											</span>
+											<span
+												className={cn(
+													"text-[10px] uppercase",
+													item.status === "succeeded"
+														? "text-emerald-500"
+														: item.status === "failed"
+															? "text-red-500"
+															: "text-amber-500",
+												)}
+											>
+												{item.status}
+											</span>
+										</div>
+										<div className="mt-2 text-xs whitespace-pre-wrap">
+											{item.output ?? item.error ?? "Waiting for response..."}
+										</div>
+										<div className="mt-3 flex gap-2">
+											<Button
+												type="button"
+												variant="secondary"
+												size="sm"
+												className="flex-1"
+												onClick={() => handleCopy(item.output ?? "")}
+												disabled={!item.output}
+											>
+												Copy
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												className="flex-1"
+												onClick={() => handleApply(item.output ?? "")}
+												disabled={!item.output}
+											>
+												Apply
+											</Button>
+										</div>
+									</div>
+								))
+							)}
+						</div>
+						<div className="mt-4">
+							<BackendStatusIndicator />
+						</div>
+					</div>
+				)}
+
+				{/* Activity Tab */}
+				{activeTab === "activity" && (
+					<ActivityStream activities={sampleActivities} />
+				)}
 			</SidebarContent>
 			<SidebarRail />
 		</Sidebar>
