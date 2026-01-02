@@ -233,24 +233,37 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed bottom-0 top-[var(--app-titlebar-height)] z-10 hidden w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed bottom-0 top-[var(--app-titlebar-height)] z-10 hidden w-(--sidebar-width) transition-[width] duration-200 ease-linear md:flex",
+          "group-data-[collapsible=offcanvas]:pointer-events-none",
           side === "left"
-            ? "left-[var(--sidebar-left-offset,0px)] group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-            : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Adjust the padding for floating and inset variants.
+            ? "left-[var(--sidebar-left-offset,0px)] overflow-hidden"
+            : "right-0",
           variant === "floating" || variant === "inset"
-            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
-          className
+            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
+            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
         )}
-        {...props}
       >
         <div
-          data-sidebar="sidebar"
-          data-slot="sidebar-inner"
-          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          data-slot="sidebar-panel"
+          className={cn(
+            "absolute inset-0 flex h-full w-full transition-transform duration-200 ease-linear",
+            side === "left"
+              ? "group-data-[collapsible=offcanvas]:-translate-x-full"
+              : "group-data-[collapsible=offcanvas]:translate-x-full",
+            variant === "floating" || variant === "inset"
+              ? "p-2"
+              : "group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            className
+          )}
+          {...props}
         >
-          {children}
+          <div
+            data-sidebar="sidebar"
+            data-slot="sidebar-inner"
+            className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>
