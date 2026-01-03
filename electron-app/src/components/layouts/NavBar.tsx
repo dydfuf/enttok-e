@@ -67,11 +67,6 @@ export function NavBar() {
           </TooltipTrigger>
           <TooltipContent side="right">Settings</TooltipContent>
         </Tooltip>
-
-        {/* Profile avatar */}
-        <div className="size-8 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-inner">
-          JD
-        </div>
       </div>
     </nav>
   );

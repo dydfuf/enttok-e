@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	Select,
@@ -23,6 +24,11 @@ import { useVault } from "@/contexts/VaultContext";
 import { useBackend } from "@/contexts/BackendContext";
 import { FolderOpen, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+	DEFAULT_ASSETS_FOLDER,
+	joinPath,
+	validateAssetsFolder,
+} from "@/lib/vault-paths";
 import type { RuntimeBinaryStatus, RuntimeStatus } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
 
@@ -71,8 +77,18 @@ function SettingsPage() {
 	const { vaultPath, selectVault, closeVault } = useVault();
 	const { state, logs, health } = useBackend();
 	const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
+	const [assetsFolder, setAssetsFolder] = useState(DEFAULT_ASSETS_FOLDER);
+	const [assetsFolderInput, setAssetsFolderInput] = useState(
+		DEFAULT_ASSETS_FOLDER,
+	);
 
 	const lastLogs = useMemo(() => logs.slice(-10), [logs]);
+	const assetsFolderValidation = useMemo(
+		() => validateAssetsFolder(assetsFolderInput),
+		[assetsFolderInput],
+	);
+	const assetsFolderDirty =
+		assetsFolderValidation.normalized !== assetsFolder;
 	const status = state?.status ?? "stopped";
 	const statusLabel = STATUS_LABELS[status] ?? status;
 	const statusClass = STATUS_CLASSES[status] ?? STATUS_CLASSES.stopped;
@@ -116,6 +132,28 @@ function SettingsPage() {
 		};
 	}, []);
 
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		let mounted = true;
+		api
+			.getAssetsFolder()
+			.then((value) => {
+				if (!mounted) {
+					return;
+				}
+				const validation = validateAssetsFolder(value);
+				setAssetsFolder(validation.normalized);
+				setAssetsFolderInput(validation.normalized);
+			})
+			.catch(() => undefined);
+		return () => {
+			mounted = false;
+		};
+	}, []);
+
 	const handleSaveTemplate = () => {
 		toast.success("Template saved successfully!");
 	};
@@ -130,6 +168,21 @@ function SettingsPage() {
 	const handleCloseVault = async () => {
 		await closeVault();
 		navigate({ to: "/" });
+	};
+
+	const handleSaveAssetsFolder = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		if (!assetsFolderValidation.valid) {
+			toast.error(assetsFolderValidation.error || "Invalid assets folder");
+			return;
+		}
+		await api.setAssetsFolder(assetsFolderValidation.normalized);
+		setAssetsFolder(assetsFolderValidation.normalized);
+		setAssetsFolderInput(assetsFolderValidation.normalized);
+		toast.success("Assets folder updated");
 	};
 
 	return (
@@ -151,38 +204,88 @@ function SettingsPage() {
 					</TabsList>
 
 					<TabsContent value="general">
-						<Card>
-							<CardHeader>
-								<CardTitle>Vault</CardTitle>
-								<CardDescription>
-									Manage your notes vault location
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								<div>
-									<Label className="text-muted-foreground mb-1">
-										Current Vault
-									</Label>
-									<p className="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">
-										{vaultPath || "No vault selected"}
-									</p>
-								</div>
-								<div className="flex gap-2">
-									<Button variant="outline" onClick={handleChangeVault}>
-										<FolderOpen className="h-4 w-4 mr-2" />
-										Change Vault
-									</Button>
+						<div className="space-y-6">
+							<Card>
+								<CardHeader>
+									<CardTitle>Vault</CardTitle>
+									<CardDescription>
+										Manage your notes vault location
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div>
+										<Label className="text-muted-foreground mb-1">
+											Current Vault
+										</Label>
+										<p className="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">
+											{vaultPath || "No vault selected"}
+										</p>
+									</div>
+									<div className="flex gap-2">
+										<Button variant="outline" onClick={handleChangeVault}>
+											<FolderOpen className="h-4 w-4 mr-2" />
+											Change Vault
+										</Button>
+										<Button
+											variant="ghost"
+											className="text-destructive hover:text-destructive"
+											onClick={handleCloseVault}
+										>
+											<LogOut className="h-4 w-4 mr-2" />
+											Close Vault
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+							<Card>
+								<CardHeader>
+									<CardTitle>Assets</CardTitle>
+									<CardDescription>
+										Control where pasted images are stored
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-3">
+									<div>
+										<Label className="text-muted-foreground mb-1">
+											Assets Folder
+										</Label>
+										<Input
+											value={assetsFolderInput}
+											onChange={(e) => setAssetsFolderInput(e.target.value)}
+											placeholder={DEFAULT_ASSETS_FOLDER}
+										/>
+										<p className="text-xs text-muted-foreground mt-2">
+											Relative to the vault root. Example: assets or
+											assets/images.
+										</p>
+										{!assetsFolderValidation.valid && (
+											<p className="text-xs text-destructive mt-2">
+												{assetsFolderValidation.error}
+											</p>
+										)}
+									</div>
+									<div>
+										<Label className="text-muted-foreground mb-1">
+											Resolved Path
+										</Label>
+										<p className="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">
+											{vaultPath
+												? joinPath(vaultPath, assetsFolder)
+												: "No vault selected"}
+										</p>
+									</div>
 									<Button
-										variant="ghost"
-										className="text-destructive hover:text-destructive"
-										onClick={handleCloseVault}
+										onClick={handleSaveAssetsFolder}
+										disabled={
+											!assetsFolderDirty ||
+											!assetsFolderValidation.valid
+										}
 									>
-										<LogOut className="h-4 w-4 mr-2" />
-										Close Vault
+										Save Assets Folder
 									</Button>
-								</div>
-							</CardContent>
-						</Card>
+								</CardContent>
+							</Card>
+						</div>
 					</TabsContent>
 
 					<TabsContent value="appearance">

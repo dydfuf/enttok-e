@@ -62,5 +62,11 @@ function NoteDetailPage() {
     );
   }
 
-  return <EditorLayout initialFilePath={filePath} className="h-full" />;
+  return (
+    <EditorLayout
+      initialFilePath={filePath}
+      className="h-full"
+      vaultPath={vaultPath}
+    />
+  );
 }

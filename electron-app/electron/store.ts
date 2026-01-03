@@ -12,6 +12,7 @@ interface StoreSchema {
   recentVaults: VaultInfo[];
   maxRecentVaults: number;
   dailyCalendarCollapsed: boolean;
+  assetsFolder: string;
 }
 
 const store = new Store<StoreSchema>({
@@ -21,6 +22,7 @@ const store = new Store<StoreSchema>({
     recentVaults: [],
     maxRecentVaults: 10,
     dailyCalendarCollapsed: true,
+    assetsFolder: "assets",
   },
 });
 
@@ -68,6 +70,14 @@ export function getDailyCalendarCollapsed(): boolean {
 
 export function setDailyCalendarCollapsed(collapsed: boolean): void {
   store.set("dailyCalendarCollapsed", collapsed);
+}
+
+export function getAssetsFolder(): string {
+  return store.get("assetsFolder");
+}
+
+export function setAssetsFolder(folder: string): void {
+  store.set("assetsFolder", folder);
 }
 
 export function hasVault(): boolean {

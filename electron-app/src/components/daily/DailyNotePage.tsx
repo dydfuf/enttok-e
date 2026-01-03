@@ -113,6 +113,7 @@ export function DailyNotePage({
           hideToolbar
           onDirtyChange={setIsDirty}
           onSaveRef={saveRef}
+          vaultPath={vaultPath}
         />
       </div>
     </div>

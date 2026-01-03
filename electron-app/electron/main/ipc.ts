@@ -21,6 +21,8 @@ import {
   removeFromRecentVaults,
   getDailyCalendarCollapsed,
   setDailyCalendarCollapsed,
+  getAssetsFolder,
+  setAssetsFolder,
 } from "../store.js";
 import {
   getBackendState,
@@ -92,6 +94,11 @@ export function registerIpcHandlers() {
   );
   ipcMain.handle("store:set-daily-calendar-collapsed", (_, collapsed: boolean) => {
     setDailyCalendarCollapsed(collapsed);
+    return { success: true };
+  });
+  ipcMain.handle("store:get-assets-folder", () => getAssetsFolder());
+  ipcMain.handle("store:set-assets-folder", (_, folder: string) => {
+    setAssetsFolder(folder);
     return { success: true };
   });
 

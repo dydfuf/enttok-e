@@ -57,6 +57,9 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("store:get-daily-calendar-collapsed"),
   setDailyCalendarCollapsed: (collapsed: boolean) =>
     ipcRenderer.invoke("store:set-daily-calendar-collapsed", collapsed),
+  getAssetsFolder: () => ipcRenderer.invoke("store:get-assets-folder"),
+  setAssetsFolder: (folder: string) =>
+    ipcRenderer.invoke("store:set-assets-folder", folder),
 
   // Backend API
   startBackend: () => ipcRenderer.invoke("backend:start"),

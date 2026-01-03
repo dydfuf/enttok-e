@@ -202,6 +202,8 @@ export type ElectronAPI = {
   setDailyCalendarCollapsed: (
     collapsed: boolean
   ) => Promise<{ success: boolean }>;
+  getAssetsFolder: () => Promise<string>;
+  setAssetsFolder: (folder: string) => Promise<{ success: boolean }>;
   startBackend: () => Promise<BackendState>;
   stopBackend: () => Promise<BackendState>;
   getBackendStatus: () => Promise<BackendState>;

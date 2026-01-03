@@ -3,6 +3,7 @@ import { ViewPlugin, Decoration, EditorView, WidgetType } from "@codemirror/view
 import type { ViewUpdate, DecorationSet } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNodeRef } from "@lezer/common";
+import { resolveAssetUrl } from "@/lib/vault-paths";
 
 // Checkbox Widget for task lists
 class CheckboxWidget extends WidgetType {
@@ -36,6 +37,29 @@ class CheckboxWidget extends WidgetType {
 
   ignoreEvent(): boolean {
     return false;
+  }
+}
+
+class ImageWidget extends WidgetType {
+  constructor(readonly src: string, readonly alt: string) {
+    super();
+  }
+
+  toDOM(): HTMLElement {
+    const wrapper = document.createElement("span");
+    wrapper.className = "cm-md-image";
+
+    const image = document.createElement("img");
+    image.src = this.src;
+    image.alt = this.alt;
+    image.loading = "lazy";
+
+    wrapper.appendChild(image);
+    return wrapper;
+  }
+
+  eq(other: ImageWidget): boolean {
+    return other.src === this.src && other.alt === this.alt;
   }
 }
 
@@ -120,6 +144,59 @@ function processEmphasis(
     // Hide closing marker
     builder.add(to - starCount, to, hiddenMarkerDecoration);
   }
+}
+
+type ImageMatch = {
+  alt: string;
+  url: string;
+};
+
+function parseImageMarkdown(text: string): ImageMatch | null {
+  const match = text.match(/^!\[([^\]]*)\]\(([^)]*)\)$/);
+  if (!match) {
+    return null;
+  }
+  const alt = match[1];
+  let url = match[2].trim();
+  if (!url) {
+    return null;
+  }
+  if (url.startsWith("<") && url.endsWith(">")) {
+    url = url.slice(1, -1).trim();
+  }
+  const titleMatch = url.match(/^(\S+)\s+['"].*['"]$/);
+  if (titleMatch) {
+    url = titleMatch[1];
+  }
+  if (!url) {
+    return null;
+  }
+  return { alt, url };
+}
+
+function processImage(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder
+) {
+  const { from, to } = node;
+
+  if (isLineWithCursor(view, from)) return;
+
+  const text = view.state.doc.sliceString(from, to);
+  const parsed = parseImageMarkdown(text);
+  if (!parsed) {
+    return;
+  }
+
+  const notePath = view.dom.dataset.filePath || null;
+  const resolvedSrc = resolveAssetUrl(notePath, parsed.url);
+  if (!resolvedSrc) {
+    return;
+  }
+
+  builder.add(from, to, hiddenMarkerDecoration);
+  builder.addWidget(from, new ImageWidget(resolvedSrc, parsed.alt), 1);
 }
 
 // Process inline code
@@ -365,6 +442,9 @@ class LivePreviewPlugin {
             case "Link":
               processLink(node, view, builder);
               break;
+            case "Image":
+              processImage(node, view, builder);
+              break;
             case "Strikethrough":
               processStrikethrough(node, view, builder);
               break;
@@ -530,6 +610,18 @@ export const livePreviewTheme = EditorView.baseTheme({
     textDecoration: "line-through",
     opacity: "0.6",
     color: "hsl(var(--muted-foreground))",
+  },
+
+  ".cm-md-image": {
+    display: "block",
+    padding: "0.5rem 0",
+  },
+
+  ".cm-md-image img": {
+    display: "block",
+    maxWidth: "100%",
+    height: "auto",
+    borderRadius: "0.5rem",
   },
 });
 

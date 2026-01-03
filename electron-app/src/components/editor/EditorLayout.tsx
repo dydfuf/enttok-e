@@ -11,6 +11,7 @@ interface EditorLayoutProps {
   hideToolbar?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onSaveRef?: React.MutableRefObject<(() => void) | null>;
+  vaultPath?: string | null;
 }
 
 export function EditorLayout({
@@ -19,6 +20,7 @@ export function EditorLayout({
   hideToolbar = false,
   onDirtyChange,
   onSaveRef,
+  vaultPath,
 }: EditorLayoutProps) {
   const {
     filePath,
@@ -121,6 +123,8 @@ export function EditorLayout({
           value={content}
           onChange={setContent}
           className="h-full"
+          filePath={filePath}
+          vaultPath={vaultPath}
         />
       </div>
     </div>

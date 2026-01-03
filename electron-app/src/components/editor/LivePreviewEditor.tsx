@@ -17,8 +17,15 @@ import {
 } from "@codemirror/language";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { livePreview } from "./extensions/livePreview";
+import { getElectronAPI } from "@/lib/electron";
+import {
+  joinPath,
+  relativePathFromFile,
+  validateAssetsFolder,
+} from "@/lib/vault-paths";
 
 interface LivePreviewEditorProps {
   value: string;
@@ -26,6 +33,8 @@ interface LivePreviewEditorProps {
   className?: string;
   placeholderText?: string;
   readOnly?: boolean;
+  filePath?: string | null;
+  vaultPath?: string | null;
 }
 
 // Light theme for live preview editor
@@ -118,17 +127,144 @@ const darkTheme = EditorView.theme(
   { dark: true }
 );
 
+const IMAGE_EXTENSION_MAP: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+  "image/heic": "heic",
+  "image/heif": "heif",
+};
+
+function getImageExtension(mimeType: string): string {
+  if (!mimeType) {
+    return "png";
+  }
+  const normalized = mimeType.toLowerCase();
+  if (IMAGE_EXTENSION_MAP[normalized]) {
+    return IMAGE_EXTENSION_MAP[normalized];
+  }
+  const suffix = normalized.split("/")[1];
+  if (!suffix) {
+    return "png";
+  }
+  if (suffix === "jpeg") {
+    return "jpg";
+  }
+  return suffix;
+}
+
+function buildImageFileName(extension: string): string {
+  const now = new Date();
+  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}${String(now.getDate()).padStart(2, "0")}`;
+  const time = `${String(now.getHours()).padStart(2, "0")}${String(
+    now.getMinutes()
+  ).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  const random = Math.random().toString(36).slice(2, 8);
+  return `image-${date}-${time}-${random}.${extension}`;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Failed to read image data"));
+        return;
+      }
+      const base64 = reader.result.split(",")[1];
+      if (!base64) {
+        reject(new Error("Missing image data"));
+        return;
+      }
+      resolve(base64);
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error("Failed to read image data"));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function getClipboardImageFiles(data: DataTransfer | null): File[] {
+  if (!data) {
+    return [];
+  }
+  const filesFromItems: File[] = [];
+  if (data.items && data.items.length > 0) {
+    for (const item of Array.from(data.items)) {
+      if (item.kind !== "file" || !item.type.startsWith("image/")) {
+        continue;
+      }
+      const file = item.getAsFile();
+      if (file) {
+        filesFromItems.push(file);
+      }
+    }
+  }
+  if (filesFromItems.length > 0) {
+    return pickPrimaryClipboardImages(filesFromItems);
+  }
+
+  const filesFromFiles: File[] = [];
+  if (data.files && data.files.length > 0) {
+    for (const file of Array.from(data.files)) {
+      if (file.type.startsWith("image/")) {
+        filesFromFiles.push(file);
+      }
+    }
+  }
+  return pickPrimaryClipboardImages(filesFromFiles);
+}
+
+function pickPrimaryClipboardImages(files: File[]): File[] {
+  if (files.length <= 1) {
+    return files;
+  }
+  const namedFiles = files.filter((file) => file.name);
+  const uniqueNames = new Set(namedFiles.map((file) => file.name));
+  if (uniqueNames.size > 1) {
+    return files;
+  }
+  const preferredTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+  for (const type of preferredTypes) {
+    const match = files.find((file) => file.type === type);
+    if (match) {
+      return [match];
+    }
+  }
+  return [files[0]];
+}
+
 export function LivePreviewEditor({
   value,
   onChange,
   className,
   placeholderText = "Start writing...",
   readOnly = false,
+  filePath = null,
+  vaultPath = null,
 }: LivePreviewEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
   const readOnlyCompartment = useRef(new Compartment());
+  const vaultPathRef = useRef<string | null>(vaultPath);
+  const filePathRef = useRef<string | null>(filePath);
+  const readOnlyRef = useRef(readOnly);
+
+  useEffect(() => {
+    vaultPathRef.current = vaultPath;
+  }, [vaultPath]);
+
+  useEffect(() => {
+    filePathRef.current = filePath;
+  }, [filePath]);
 
   // Check initial dark mode
   const isDark = useMemo(() => {
@@ -137,6 +273,80 @@ export function LivePreviewEditor({
     }
     return false;
   }, []);
+
+  const handlePasteImages = async (view: EditorView, files: File[]) => {
+    const api = getElectronAPI();
+    if (!api) {
+      toast.error("Image paste is unavailable");
+      return;
+    }
+    const currentVaultPath = vaultPathRef.current;
+    const currentFilePath = filePathRef.current;
+    if (!currentVaultPath || !currentFilePath) {
+      toast.error("Save the note before pasting images");
+      return;
+    }
+
+    let storedAssetsFolder: string | null = null;
+    try {
+      storedAssetsFolder = await api.getAssetsFolder();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load assets folder"
+      );
+    }
+    const validation = validateAssetsFolder(storedAssetsFolder);
+    if (!validation.valid) {
+      toast.error(validation.error || "Invalid assets folder, using default");
+    }
+    const assetsFolder = validation.normalized;
+
+    const markdownSnippets: string[] = [];
+
+    for (const file of files) {
+      try {
+        const extension = getImageExtension(file.type);
+        const base64 = await readFileAsBase64(file);
+        const fileName = buildImageFileName(extension);
+        const assetFilePath = joinPath(
+          currentVaultPath,
+          assetsFolder,
+          fileName
+        );
+        const writeResult = await api.writeBinaryFile(assetFilePath, base64);
+        if (!writeResult.success) {
+          toast.error(writeResult.error || "Failed to save image");
+          continue;
+        }
+        const relativePath = relativePathFromFile(
+          currentFilePath,
+          assetFilePath
+        );
+        markdownSnippets.push(`![](${relativePath})`);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to paste image"
+        );
+      }
+    }
+
+    if (!markdownSnippets.length || !view.dom.isConnected) {
+      return;
+    }
+
+    const insertText = markdownSnippets.join("\n");
+    const selection = view.state.selection.main;
+    view.dispatch({
+      changes: {
+        from: selection.from,
+        to: selection.to,
+        insert: insertText,
+      },
+      selection: { anchor: selection.from + insertText.length },
+    });
+  };
 
   // Initialize editor
   useEffect(() => {
@@ -159,6 +369,21 @@ export function LivePreviewEditor({
         ...searchKeymap,
         ...completionKeymap,
       ]),
+      EditorView.domEventHandlers({
+        paste: (event, view) => {
+          const files = getClipboardImageFiles(event.clipboardData);
+          if (files.length === 0) {
+            return false;
+          }
+          event.preventDefault();
+          if (readOnlyRef.current) {
+            toast.error("Editing is disabled");
+            return true;
+          }
+          void handlePasteImages(view, files);
+          return true;
+        },
+      }),
       autocompletion(),
       placeholder(placeholderText),
       themeCompartment.current.of(isDark ? darkTheme : lightTheme),
@@ -183,6 +408,8 @@ export function LivePreviewEditor({
       state,
       parent: containerRef.current,
     });
+
+    view.dom.dataset.filePath = filePath ?? "";
 
     editorRef.current = view;
 
@@ -230,8 +457,15 @@ export function LivePreviewEditor({
     }
   }, [value]);
 
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.dom.dataset.filePath = filePath ?? "";
+    }
+  }, [filePath]);
+
   // Update readOnly state
   useEffect(() => {
+    readOnlyRef.current = readOnly;
     if (editorRef.current) {
       editorRef.current.dispatch({
         effects: readOnlyCompartment.current.reconfigure(
