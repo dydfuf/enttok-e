@@ -15,6 +15,7 @@ import {
   type ShortcutItem,
   type TagItem,
 } from "@/components/sidebar";
+import { useDailyNotes } from "@/hooks/useDailyNotes";
 
 // Placeholder data - will be replaced with real data from hooks
 const defaultShortcuts: ShortcutItem[] = [
@@ -31,6 +32,7 @@ const defaultTags: TagItem[] = [
 
 export default function AppSidebar() {
   const [searchValue, setSearchValue] = useState("");
+  const { datesWithNotes } = useDailyNotes();
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-r-0">
@@ -48,7 +50,7 @@ export default function AppSidebar() {
 
         {/* Mini Calendar */}
         <div className="px-4 py-4">
-          <SidebarCalendar />
+          <SidebarCalendar datesWithNotes={datesWithNotes} />
         </div>
 
         {/* Quick Filters */}
