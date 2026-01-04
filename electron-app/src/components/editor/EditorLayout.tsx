@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useAutoSave } from "@/hooks/useAutoSave";
-import { LivePreviewEditor } from "./LivePreviewEditor";
+import { LivePreviewEditor, type SelectionInfo } from "./LivePreviewEditor";
 import { EditorToolbar } from "./EditorToolbar";
 import { cn } from "@/lib/utils";
+import { useEditorOptional } from "@/contexts/EditorContext";
 
 interface EditorLayoutProps {
   initialFilePath?: string;
@@ -37,14 +38,31 @@ export function EditorLayout({
 
   const contentRef = useRef(content);
   const filePathRef = useRef(filePath);
+  const editorContext = useEditorOptional();
 
   useEffect(() => {
     contentRef.current = content;
-  }, [content]);
+    editorContext?.setNoteContent(content);
+  }, [content, editorContext]);
 
   useEffect(() => {
     filePathRef.current = filePath;
-  }, [filePath]);
+    editorContext?.setNotePath(filePath);
+  }, [filePath, editorContext]);
+
+  const handleSelectionChange = useCallback(
+    (selection: SelectionInfo | null) => {
+      if (selection) {
+        editorContext?.setSelection(selection.text, {
+          from: selection.from,
+          to: selection.to,
+        });
+      } else {
+        editorContext?.clearSelection();
+      }
+    },
+    [editorContext]
+  );
 
   // Expose save function to parent
   useEffect(() => {
@@ -91,8 +109,10 @@ export function EditorLayout({
     };
 
     window.addEventListener("suggestion:apply", handler);
+    window.addEventListener("editor:append", handler);
     return () => {
       window.removeEventListener("suggestion:apply", handler);
+      window.removeEventListener("editor:append", handler);
     };
   }, [setContent]);
 
@@ -125,6 +145,7 @@ export function EditorLayout({
           className="h-full"
           filePath={filePath}
           vaultPath={vaultPath}
+          onSelectionChange={handleSelectionChange}
         />
       </div>
     </div>

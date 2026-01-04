@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarHeader,
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";

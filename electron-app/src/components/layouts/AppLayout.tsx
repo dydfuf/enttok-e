@@ -2,7 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { NavBar } from "./NavBar";
 import AppSidebar from "./AppSidebar";
-import SuggestionSidebar from "./SuggestionSidebar";
+import AssistantSidebar from "./AssistantSidebar";
 import { StatusBar } from "./StatusBar";
 import { SidebarToggleBridge } from "@/contexts/SidebarControlsContext";
 
@@ -28,10 +28,9 @@ export default function AppLayout() {
           </SidebarInset>
         </SidebarProvider>
 
-        {/* Right Suggestion Sidebar */}
         <SidebarProvider className="min-h-0 w-auto flex-none" keyboardShortcut="l">
           <SidebarToggleBridge side="right" />
-          <SuggestionSidebar />
+          <AssistantSidebar />
         </SidebarProvider>
       </div>
       <StatusBar />

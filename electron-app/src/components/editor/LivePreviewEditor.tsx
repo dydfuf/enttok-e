@@ -27,6 +27,12 @@ import {
   validateAssetsFolder,
 } from "@/lib/vault-paths";
 
+export interface SelectionInfo {
+  text: string;
+  from: number;
+  to: number;
+}
+
 interface LivePreviewEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -35,6 +41,7 @@ interface LivePreviewEditorProps {
   readOnly?: boolean;
   filePath?: string | null;
   vaultPath?: string | null;
+  onSelectionChange?: (selection: SelectionInfo | null) => void;
 }
 
 // Light theme for live preview editor
@@ -249,6 +256,7 @@ export function LivePreviewEditor({
   readOnly = false,
   filePath = null,
   vaultPath = null,
+  onSelectionChange,
 }: LivePreviewEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
@@ -257,6 +265,8 @@ export function LivePreviewEditor({
   const vaultPathRef = useRef<string | null>(vaultPath);
   const filePathRef = useRef<string | null>(filePath);
   const readOnlyRef = useRef(readOnly);
+  const selectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSelectionChangeRef = useRef(onSelectionChange);
 
   useEffect(() => {
     vaultPathRef.current = vaultPath;
@@ -266,7 +276,18 @@ export function LivePreviewEditor({
     filePathRef.current = filePath;
   }, [filePath]);
 
-  // Check initial dark mode
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
+
+  useEffect(() => {
+    return () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const isDark = useMemo(() => {
     if (typeof document !== "undefined") {
       return document.documentElement.classList.contains("dark");
@@ -392,6 +413,28 @@ export function LivePreviewEditor({
         if (update.docChanged) {
           const newValue = update.state.doc.toString();
           onChange(newValue);
+        }
+
+        if (update.selectionSet || update.docChanged) {
+          if (selectionTimeoutRef.current) {
+            clearTimeout(selectionTimeoutRef.current);
+          }
+
+          selectionTimeoutRef.current = setTimeout(() => {
+            const selection = update.state.selection.main;
+            const hasSelection = selection.from !== selection.to;
+
+            if (hasSelection && onSelectionChangeRef.current) {
+              const selectedText = update.state.sliceDoc(selection.from, selection.to);
+              onSelectionChangeRef.current({
+                text: selectedText,
+                from: selection.from,
+                to: selection.to,
+              });
+            } else if (onSelectionChangeRef.current) {
+              onSelectionChangeRef.current(null);
+            }
+          }, 150);
         }
       }),
       EditorView.lineWrapping,
