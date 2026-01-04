@@ -233,7 +233,7 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed bottom-0 top-[var(--app-titlebar-height)] z-10 hidden w-(--sidebar-width) transition-[width] duration-200 ease-linear md:flex",
+          "fixed bottom-[var(--app-statusbar-height,0px)] top-[var(--app-titlebar-height)] z-10 hidden w-(--sidebar-width) transition-[width] duration-200 ease-linear md:flex",
           "group-data-[collapsible=offcanvas]:pointer-events-none",
           side === "left"
             ? "left-[var(--sidebar-left-offset,0px)] overflow-hidden"

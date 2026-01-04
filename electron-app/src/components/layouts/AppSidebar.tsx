@@ -36,16 +36,10 @@ export default function AppSidebar() {
 
   return (
     <Sidebar collapsible="offcanvas" variant="sidebar" className="border-r-0">
-      <SidebarHeader className="h-12 flex-row items-center px-4 group-data-[collapsible=offcanvas]:hidden">
-        <span className="text-sm font-semibold">Enttok-e</span>
-      </SidebarHeader>
-      <SidebarContent className="gap-0 overflow-y-auto">
+      <SidebarContent className="mt-4 gap-0 overflow-y-auto">
         {/* Search */}
-        <div className="px-4 pb-2">
-          <SidebarSearch
-            value={searchValue}
-            onChange={setSearchValue}
-          />
+        <div className="px-4 py-2">
+          <SidebarSearch value={searchValue} onChange={setSearchValue} />
         </div>
 
         {/* Mini Calendar */}
