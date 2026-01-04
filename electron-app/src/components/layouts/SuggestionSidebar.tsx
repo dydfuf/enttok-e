@@ -373,147 +373,142 @@ export default function SuggestionSidebar() {
 	}, []);
 
 	return (
-		<Sidebar collapsible="icon" variant="sidebar" side="right">
-			<SidebarHeader className="h-12 flex-row items-center px-3">
-				<span className="text-sm font-semibold group-data-[collapsible=icon]:hidden">
-					Assistant
-				</span>
-			</SidebarHeader>
-			<SidebarContent className="group-data-[collapsible=icon]:hidden">
-				{/* Tab buttons */}
-				<div className="flex items-center gap-1 p-2 border-b border-border bg-muted/30">
-					<Button
-						variant={activeTab === "suggestions" ? "secondary" : "ghost"}
-						size="sm"
-						className="flex-1 gap-2"
-						onClick={() => setActiveTab("suggestions")}
-					>
-						<Sparkles className="size-4" />
-					</Button>
-					<Button
-						variant={activeTab === "activity" ? "secondary" : "ghost"}
-						size="sm"
-						className="flex-1 gap-2"
-						onClick={() => setActiveTab("activity")}
-					>
-						<History className="size-4" />
-					</Button>
-				</div>
+    <Sidebar collapsible="icon" variant="sidebar" side="right">
+      <SidebarContent className="group-data-[collapsible=icon]:hidden">
+        {/* Tab buttons */}
+        <div className="flex items-center gap-1 p-1 h-10 border-b border-border bg-muted/30">
+          <Button
+            variant={activeTab === "suggestions" ? "secondary" : "ghost"}
+            size="sm"
+            className="flex-1 gap-2"
+            onClick={() => setActiveTab("suggestions")}
+          >
+            <Sparkles className="size-4" />
+          </Button>
+          <Button
+            variant={activeTab === "activity" ? "secondary" : "ghost"}
+            size="sm"
+            className="flex-1 gap-2"
+            onClick={() => setActiveTab("activity")}
+          >
+            <History className="size-4" />
+          </Button>
+        </div>
 
-				{/* Suggestions Tab */}
-				{activeTab === "suggestions" && (
-					<div className="flex-1 p-4 overflow-y-auto">
-						<div className="text-sm text-muted-foreground text-center py-6">
-							<Lightbulb className="mx-auto mb-2 size-6 opacity-50" />
-							Generate a quick suggestion with Claude
-						</div>
-						<div className="space-y-3">
-							<Textarea
-								value={prompt}
-								onChange={(event) => setPrompt(event.target.value)}
-								placeholder="e.g., summarize today's work log in 3 bullets"
-								className="min-h-20"
-							/>
-							<div className="flex gap-2">
-								<Button
-									type="button"
-									className="flex-1"
-									onClick={handleSubmit}
-									disabled={isSubmitting || !prompt.trim()}
-								>
-									{isSubmitting ? (
-										<>
-											<Loader2 className="mr-2 size-4 animate-spin" />
-											Running
-										</>
-									) : (
-										"Generate"
-									)}
-								</Button>
-								<Button
-									type="button"
-									variant="secondary"
-									className="flex-1"
-									onClick={handleNewSession}
-								>
-									New Session
-								</Button>
-							</div>
-							<div className="text-[11px] text-muted-foreground">
-								Session: {sessionId ?? "not started"}
-							</div>
-						</div>
-						<div className="mt-4">
-							<GitHubActivityCard />
-						</div>
-						<div className="mt-4 space-y-3">
-							{suggestions.length === 0 ? (
-								<div className="text-xs text-muted-foreground text-center py-3">
-									No suggestions yet
-								</div>
-							) : (
-								suggestions.map((item) => (
-									<div
-										key={item.id}
-										className="rounded-lg border border-border bg-card p-3"
-									>
-										<div className="flex items-center justify-between text-xs text-muted-foreground">
-											<span className="truncate max-w-[180px]">
-												{item.prompt}
-											</span>
-											<span
-												className={cn(
-													"text-[10px] uppercase",
-													item.status === "succeeded"
-														? "text-emerald-500"
-														: item.status === "failed"
-															? "text-red-500"
-															: "text-amber-500",
-												)}
-											>
-												{item.status}
-											</span>
-										</div>
-										<div className="mt-2 text-xs whitespace-pre-wrap">
-											{item.output ?? item.error ?? "Waiting for response..."}
-										</div>
-										<div className="mt-3 flex gap-2">
-											<Button
-												type="button"
-												variant="secondary"
-												size="sm"
-												className="flex-1"
-												onClick={() => handleCopy(item.output ?? "")}
-												disabled={!item.output}
-											>
-												Copy
-											</Button>
-											<Button
-												type="button"
-												size="sm"
-												className="flex-1"
-												onClick={() => handleApply(item.output ?? "")}
-												disabled={!item.output}
-											>
-												Apply
-											</Button>
-										</div>
-									</div>
-								))
-							)}
-						</div>
-						<div className="mt-4">
-							<BackendStatusIndicator />
-						</div>
-					</div>
-				)}
+        {/* Suggestions Tab */}
+        {activeTab === "suggestions" && (
+          <div className="flex-1 p-4 overflow-y-auto">
+            <div className="text-sm text-muted-foreground text-center py-6">
+              <Lightbulb className="mx-auto mb-2 size-6 opacity-50" />
+              Generate a quick suggestion with Claude
+            </div>
+            <div className="space-y-3">
+              <Textarea
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="e.g., summarize today's work log in 3 bullets"
+                className="min-h-20"
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !prompt.trim()}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Running
+                    </>
+                  ) : (
+                    "Generate"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={handleNewSession}
+                >
+                  New Session
+                </Button>
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                Session: {sessionId ?? "not started"}
+              </div>
+            </div>
+            <div className="mt-4">
+              <GitHubActivityCard />
+            </div>
+            <div className="mt-4 space-y-3">
+              {suggestions.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-3">
+                  No suggestions yet
+                </div>
+              ) : (
+                suggestions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-lg border border-border bg-card p-3"
+                  >
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="truncate max-w-[180px]">
+                        {item.prompt}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[10px] uppercase",
+                          item.status === "succeeded"
+                            ? "text-emerald-500"
+                            : item.status === "failed"
+                              ? "text-red-500"
+                              : "text-amber-500"
+                        )}
+                      >
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs whitespace-pre-wrap">
+                      {item.output ?? item.error ?? "Waiting for response..."}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleCopy(item.output ?? "")}
+                        disabled={!item.output}
+                      >
+                        Copy
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleApply(item.output ?? "")}
+                        disabled={!item.output}
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-4">
+              <BackendStatusIndicator />
+            </div>
+          </div>
+        )}
 
-				{/* Activity Tab */}
-				{activeTab === "activity" && (
-					<ActivityStream activities={sampleActivities} />
-				)}
-			</SidebarContent>
-			<SidebarRail />
-		</Sidebar>
-	);
+        {/* Activity Tab */}
+        {activeTab === "activity" && (
+          <ActivityStream activities={sampleActivities} />
+        )}
+      </SidebarContent>
+      <SidebarRail />
+    </Sidebar>
+  );
 }
