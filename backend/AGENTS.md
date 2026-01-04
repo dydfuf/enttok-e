@@ -1,124 +1,92 @@
 # BACKEND KNOWLEDGE BASE
 
 ## OVERVIEW
-
-FastAPI backend for enttok-E. Runs as subprocess from Electron. SQLite database, Google Calendar sync, Claude AI integration.
+FastAPI backend for enttok-E managing SQLite persistence, Google Calendar synchronization, and Claude AI conversation sessions.
 
 ## STRUCTURE
-
 ```
 backend/
 ├── app/
-│   ├── main.py           # FastAPI app factory, startup/shutdown
+│   ├── main.py           # FastAPI app factory and router registration
 │   ├── api/              # Route handlers
-│   │   ├── health.py     # /health endpoint
-│   │   ├── status.py     # /status endpoint  
-│   │   ├── jobs.py       # /jobs/* job queue endpoints
-│   │   ├── claude.py     # /claude/* AI endpoints
-│   │   ├── calendar.py   # /calendar/* Google Calendar
-│   │   └── events.py     # /events WebSocket endpoint
-│   ├── services/         # Business logic
-│   │   ├── jobs.py       # Background job processing
-│   │   ├── claude.py     # Claude API interaction
-│   │   ├── calendar.py   # Calendar event processing
-│   │   ├── google_calendar.py  # Google API wrapper
-│   │   └── google_oauth.py     # OAuth flow
-│   ├── db/               # Database layer
-│   │   ├── connection.py # SQLite connection management
-│   │   ├── jobs_repo.py  # Jobs table operations
-│   │   └── calendar_repo.py  # Calendar table operations
-│   ├── schemas/          # Pydantic models
-│   ├── core/             # Config, logging
-│   ├── websocket/        # WebSocket manager
-│   └── utils/            # Helpers
-└── pyproject.toml        # uv project config
+│   │   ├── deps.py       # Auth dependencies (verify_token)
+│   │   └── ...           # health, status, jobs, claude, calendar, events
+│   ├── services/         # Business logic (jobs, claude, sessions, calendar)
+│   ├── db/               # Repository pattern (SQLite + aiosqlite)
+│   ├── schemas/          # Pydantic models for request/response
+│   ├── websocket/        # Real-time event broadcasting (manager.py)
+│   ├── core/             # Configuration (config.py) and logging
+│   └── utils/            # Time and formatting helpers
+└── pyproject.toml        # uv project configuration
 ```
 
 ## WHERE TO LOOK
-
 | Task | Location |
 |------|----------|
 | Add API endpoint | `app/api/` (register in `main.py`) |
 | Add business logic | `app/services/` |
-| Add Pydantic model | `app/schemas/` |
-| Add DB operation | `app/db/` |
+| Modify Auth/Deps | `app/api/deps.py` |
+| Database operations | `app/db/` |
+| AI Session Logic | `app/services/sessions.py` |
 | Change config | `app/core/config.py` |
 
 ## API ROUTES
-
 | Prefix | Router | Purpose |
 |--------|--------|---------|
-| `/health` | health.py | Health check |
-| `/status` | status.py | App status |
-| `/jobs` | jobs.py | Background jobs |
-| `/claude` | claude.py | AI spawn/session |
-| `/calendar` | calendar.py | Google Calendar CRUD |
-| `/events` | events.py | WebSocket stream |
+| `/health` | health.py | System health check |
+| `/status` | status.py | Backend application status |
+| `/jobs` | jobs.py | Background task queue management |
+| `/claude` | claude.py | Claude AI integration and sessions |
+| `/calendar` | calendar.py | Google Calendar CRUD operations |
+| `/events` | events.py | WebSocket log and event stream |
 
 ## PATTERNS
-
-**Adding an endpoint:**
+**Authentication:**
+All protected routes must use the `verify_token` dependency for security.
 ```python
-# app/api/myfeature.py
-from fastapi import APIRouter
-
-router = APIRouter(prefix="/myfeature", tags=["myfeature"])
-
-@router.get("/")
-async def get_items():
-    return {"items": []}
-
-# app/main.py
-from app.api import myfeature
-app.include_router(myfeature.router)
+@router.post("/secure")
+async def secure_route(_: None = Depends(verify_token)):
+    return {"status": "ok"}
 ```
 
-**Service layer:**
+**AI Session Management:**
+`app/services/sessions.py` handles history and limits (max chars/messages).
 ```python
-# Keep routes thin, logic in services
+session = session_manager.get_session(session_id)
+await session.add_message("user", content)
+```
+
+**Service Layer:**
+Keep route handlers thin. Delegate all complexity to services.
+```python
 @router.post("/process")
-async def process(data: ProcessRequest):
-    return await my_service.process(data)
+async def process(data: MySchema, service: MyService = Depends()):
+    return await service.execute(data)
 ```
 
 ## CONVENTIONS
-
-- Async everywhere (FastAPI + aiosqlite)
-- Pydantic for all request/response models
-- Services hold business logic, routes just wire
-- Database uses repository pattern
+- **Async Everywhere**: Use `await` for all I/O (DB, HTTP, File).
+- **Repository Pattern**: Abstract DB operations into repository classes in `app/db/`.
+- **Pydantic Validation**: Strict typing for all request bodies and response models.
+- **WebSocket Broadcast**: Use `WebSocketManager.broadcast()` for UI notifications.
 
 ## CONFIGURATION
-
 | Env Var | Default | Purpose |
 |---------|---------|---------|
 | `BACKEND_PORT` | 49671 | Server port |
 | `GOOGLE_CLIENT_ID` | - | OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | - | OAuth secret |
-
-Config loaded from `backend/.env` (not committed).
+Config is loaded from `backend/.env` via `app/core/config.py`.
 
 ## ANTI-PATTERNS
+- **Sync Blocking**: Never use `time.sleep()` or sync `requests`; use `asyncio.sleep` or `httpx`.
+- **Logic in Routes**: Do not perform DB queries or complex logic directly in handlers.
+- **Auth Bypass**: Avoid exposing endpoints without `verify_token` unless public.
+- **Hardcoded Secrets**: Never put API keys in code; use environment variables.
 
-- Never put business logic in route handlers
-- Never use sync DB operations (always async)
-- Never hardcode secrets (use .env)
-- Never skip Pydantic validation
-
-## RUN
-
+## RUN & DEPENDENCIES
 ```bash
-# Standalone (usually Electron spawns this)
+# Managed by uv
 uv run python -m app.main
-
-# With custom port
-BACKEND_PORT=8080 uv run python -m app.main
 ```
-
-## DEPENDENCIES
-
-Managed by uv (see `pyproject.toml`):
-- FastAPI + Uvicorn
-- Pydantic
-- Google API Client
-- httpx (async HTTP)
+Key deps: FastAPI, Pydantic, aiosqlite, httpx, google-api-python-client.
