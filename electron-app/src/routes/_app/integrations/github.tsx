@@ -5,11 +5,13 @@ import {
   AlertCircle,
   CheckCircle2,
   ExternalLink,
+  FolderPlus,
   GitPullRequest,
   GitCommit,
   Loader2,
   RefreshCw,
   Terminal,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,22 +22,37 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useGitHubRepos } from "@/hooks/useGitHubRepos";
 
 export const Route = createFileRoute("/_app/integrations/github")({
   component: GitHubIntegrationPage,
 });
 
+function getRepoLabel(repoPath: string): string {
+  const normalized = repoPath.replace(/[\\/]+$/, "");
+  const parts = normalized.split(/[/\\]/);
+  return parts[parts.length - 1] || repoPath;
+}
+
 function GitHubIntegrationPage() {
   const { status, summary, loading, error, refresh, refreshSummary } =
     useGitHub();
+  const {
+    repoPaths,
+    loading: repoLoading,
+    error: repoError,
+    addRepo,
+    removeRepo,
+  } = useGitHubRepos();
 
   const isConnected = status?.cli.found && status?.auth.authenticated;
+  const repoSignature = repoPaths.join("|");
 
   useEffect(() => {
-    if (isConnected && !summary) {
+    if (isConnected || repoPaths.length > 0) {
       refreshSummary();
     }
-  }, [isConnected, summary, refreshSummary]);
+  }, [isConnected, repoPaths.length, repoSignature, refreshSummary]);
 
   return (
     <div className="min-h-full p-6">
@@ -71,13 +88,19 @@ function GitHubIntegrationPage() {
             onRefresh={refresh}
           />
 
-          {isConnected && (
-            <DailySummaryCard
-              summary={summary}
-              loading={loading}
-              onRefresh={() => refreshSummary()}
-            />
-          )}
+          <LocalReposCard
+            repoPaths={repoPaths}
+            loading={repoLoading}
+            error={repoError}
+            onAddRepo={addRepo}
+            onRemoveRepo={removeRepo}
+          />
+
+          <DailySummaryCard
+            summary={summary}
+            loading={loading}
+            onRefresh={() => refreshSummary()}
+          />
         </div>
       </div>
     </div>
@@ -217,6 +240,88 @@ function ConnectionStatusCard({
   );
 }
 
+type LocalReposCardProps = {
+  repoPaths: string[];
+  loading: boolean;
+  error: string | null;
+  onAddRepo: () => void;
+  onRemoveRepo: (repoPath: string) => void;
+};
+
+function LocalReposCard({
+  repoPaths,
+  loading,
+  error,
+  onAddRepo,
+  onRemoveRepo,
+}: LocalReposCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center justify-between">
+          Local Commits
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAddRepo}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FolderPlus className="h-4 w-4" />
+            )}
+            <span className="ml-2">Add repository</span>
+          </Button>
+        </CardTitle>
+        <CardDescription>
+          Commits are read locally from the repositories you select. Only these
+          folders are accessed.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {repoPaths.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No repositories selected yet.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {repoPaths.map((repoPath) => (
+              <div
+                key={repoPath}
+                className="flex items-center justify-between gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {getRepoLabel(repoPath)}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {repoPath}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveRepo(repoPath)}
+                  aria-label={`Remove ${repoPath}`}
+                  disabled={loading}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type DailySummaryCardProps = {
   summary: ReturnType<typeof useGitHub>["summary"];
   loading: boolean;
@@ -329,23 +434,40 @@ function DailySummaryCard({
               Recent Commits
             </h4>
             <div className="space-y-2">
-              {commits.slice(0, 5).map((commit) => (
-                <a
-                  key={`${commit.sha}-${commit.createdAt}`}
-                  href={commit.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 group"
-                >
+              {commits.slice(0, 5).map((commit) => {
+                const content = (
                   <div className="flex items-center gap-2 min-w-0">
                     <code className="text-xs text-muted-foreground">
                       {commit.sha}
                     </code>
                     <span className="text-sm truncate">{commit.message}</span>
                   </div>
-                  <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-                </a>
-              ))}
+                );
+
+                const rowClass =
+                  "flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 group";
+
+                if (commit.url) {
+                  return (
+                    <a
+                      key={`${commit.sha}-${commit.createdAt}`}
+                      href={commit.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={rowClass}
+                    >
+                      {content}
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 flex-shrink-0" />
+                    </a>
+                  );
+                }
+
+                return (
+                  <div key={`${commit.sha}-${commit.createdAt}`} className={rowClass}>
+                    {content}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

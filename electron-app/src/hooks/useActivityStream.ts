@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, formatDistanceToNow, isValid, parseISO, subHours } from "date-fns";
 import { useGitHub } from "@/contexts/GitHubContext";
 import { useActivityEvents } from "@/hooks/useActivityEvents";
@@ -59,7 +59,6 @@ function formatCalendarDetails(event: CalendarEvent): string {
 
 export function useActivityStream(): ActivityStreamState {
 	const {
-		status,
 		summary,
 		loading: gitHubLoading,
 		error: gitHubError,
@@ -72,6 +71,7 @@ export function useActivityStream(): ActivityStreamState {
 		() => subHours(rangeEnd, ACTIVITY_WINDOW_HOURS),
 		[rangeEnd],
 	);
+	const hasRequestedSummary = useRef(false);
 
 	const {
 		events,
@@ -96,10 +96,11 @@ export function useActivityStream(): ActivityStreamState {
 	});
 
 	useEffect(() => {
-		if (status?.cli.found && status.auth.authenticated && !summary) {
+		if (!summary && !hasRequestedSummary.current) {
+			hasRequestedSummary.current = true;
 			refreshSummary();
 		}
-	}, [status?.cli.found, status?.auth.authenticated, summary, refreshSummary]);
+	}, [summary, refreshSummary]);
 
 	const refresh = useCallback(async () => {
 		setRangeEnd(new Date());

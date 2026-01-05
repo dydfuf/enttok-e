@@ -15,6 +15,7 @@ interface StoreSchema {
   dailyNotesFolder: string;
   dailyNoteTemplate: string;
   assetsFolder: string;
+  gitHubRepoPaths: string[];
 }
 
 const DEFAULT_DAILY_NOTE_TEMPLATE = `---
@@ -45,6 +46,7 @@ const store = new Store<StoreSchema>({
     dailyNotesFolder: "daily",
     dailyNoteTemplate: DEFAULT_DAILY_NOTE_TEMPLATE,
     assetsFolder: "assets",
+    gitHubRepoPaths: [],
   },
 });
 
@@ -116,6 +118,27 @@ export function getAssetsFolder(): string {
 
 export function setAssetsFolder(folder: string): void {
   store.set("assetsFolder", folder);
+}
+
+function normalizeRepoPaths(paths: string[]): string[] {
+  const unique = new Set<string>();
+  for (const value of paths) {
+    if (!value) continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const normalized = path.normalize(trimmed);
+    if (unique.has(normalized)) continue;
+    unique.add(normalized);
+  }
+  return Array.from(unique);
+}
+
+export function getGitHubRepoPaths(): string[] {
+  return store.get("gitHubRepoPaths");
+}
+
+export function setGitHubRepoPaths(paths: string[]): void {
+  store.set("gitHubRepoPaths", normalizeRepoPaths(paths));
 }
 
 export function hasVault(): boolean {

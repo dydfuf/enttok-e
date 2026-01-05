@@ -112,6 +112,10 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("github:status") as Promise<GitHubStatus>,
   getGitHubDailySummary: (date?: string) =>
     ipcRenderer.invoke("github:daily-summary", date) as Promise<GitHubDailySummary>,
+  getGitHubRepoPaths: () => ipcRenderer.invoke("github:get-repo-paths"),
+  setGitHubRepoPaths: (paths: string[]) =>
+    ipcRenderer.invoke("github:set-repo-paths", paths),
+  selectGitHubRepoFolder: () => ipcRenderer.invoke("github:select-repo"),
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);

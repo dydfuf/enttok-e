@@ -228,4 +228,7 @@ export type ElectronAPI = {
   getJob: (jobId: string) => Promise<ClaudeJobRecord>;
   getGitHubStatus: () => Promise<GitHubStatus>;
   getGitHubDailySummary: (date?: string) => Promise<GitHubDailySummary>;
+  getGitHubRepoPaths: () => Promise<string[]>;
+  setGitHubRepoPaths: (paths: string[]) => Promise<{ success: boolean }>;
+  selectGitHubRepoFolder: () => Promise<SelectFolderResult>;
 };

@@ -27,6 +27,8 @@ import {
   setDailyNoteTemplate,
   getAssetsFolder,
   setAssetsFolder,
+  getGitHubRepoPaths,
+  setGitHubRepoPaths,
 } from "../store.js";
 import {
   getBackendState,
@@ -136,6 +138,13 @@ export function registerIpcHandlers() {
     setAssetsFolder(folder);
     return { success: true };
   });
+
+  ipcMain.handle("github:get-repo-paths", () => getGitHubRepoPaths());
+  ipcMain.handle("github:set-repo-paths", (_event, paths: string[]) => {
+    setGitHubRepoPaths(paths);
+    return { success: true };
+  });
+  ipcMain.handle("github:select-repo", () => showSelectFolderDialog());
 
   // IPC Handlers for backend operations
   ipcMain.handle("backend:start", () => startBackend());
