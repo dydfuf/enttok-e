@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, shell } from "electron";
 import {
   readFile,
   writeFile,
@@ -54,6 +54,25 @@ export function registerIpcHandlers() {
   ipcMain.handle("file:save-dialog", (_, defaultPath?: string) =>
     showSaveDialog(defaultPath)
   );
+  ipcMain.handle("system:open-external", async (_event, url: string) => {
+    if (!url) {
+      return { success: false, error: "Missing URL" };
+    }
+    try {
+      const parsed = new URL(url);
+      const allowedProtocols = new Set(["http:", "https:", "mailto:"]);
+      if (!allowedProtocols.has(parsed.protocol)) {
+        return { success: false, error: "Unsupported URL protocol" };
+      }
+      await shell.openExternal(url);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to open link",
+      };
+    }
+  });
 
   // IPC Handlers for vault/notes operations
   ipcMain.handle("vault:select-folder", () => showSelectFolderDialog());

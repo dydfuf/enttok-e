@@ -106,6 +106,10 @@ export const listMarkerDecoration = Decoration.mark({ class: "cm-md-list-marker"
 // Task list decorations
 export const taskTextCheckedDecoration = Decoration.mark({ class: "cm-md-task-checked" });
 
+const BARE_URL_REGEX =
+  /(?:https?:\/\/|www\.)[^\s<>()]+|mailto:[^\s<>()]+/gi;
+const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
+const LINK_CONTAINER_NODES = new Set(["Link", "Image", "Autolink", "URL"]);
 
 // Type for decoration builder
 type DecorationBuilder = {
@@ -225,8 +229,7 @@ function processLink(
 ) {
   const { from, to } = node;
   const text = view.state.doc.sliceString(from, to);
-
-  if (isLineWithCursor(view, from)) return;
+  const isActiveLine = isLineWithCursor(view, from);
 
   // Parse link: [text](url)
   const match = text.match(/^\[([^\]]*)\]\(([^)]*)\)$/);
@@ -234,12 +237,36 @@ function processLink(
 
   const linkTextLength = match[1].length;
 
-  // Hide [
-  builder.add(from, from + 1, hiddenMarkerDecoration);
   // Apply link style to text
   builder.add(from + 1, from + 1 + linkTextLength, linkDecoration);
-  // Hide ](url)
-  builder.add(from + 1 + linkTextLength, to, hiddenMarkerDecoration);
+
+  if (!isActiveLine) {
+    // Hide [
+    builder.add(from, from + 1, hiddenMarkerDecoration);
+    // Hide ](url)
+    builder.add(from + 1 + linkTextLength, to, hiddenMarkerDecoration);
+  }
+}
+
+function processAutolink(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder
+) {
+  const { from, to } = node;
+  const text = view.state.doc.sliceString(from, to);
+  const isActiveLine = isLineWithCursor(view, from);
+
+  if (text.startsWith("<") && text.endsWith(">") && text.length > 2) {
+    builder.add(from + 1, to - 1, linkDecoration);
+    if (!isActiveLine) {
+      builder.add(from, from + 1, hiddenMarkerDecoration);
+      builder.add(to - 1, to, hiddenMarkerDecoration);
+    }
+    return;
+  }
+
+  builder.add(from, to, linkDecoration);
 }
 
 // Process strikethrough
@@ -390,6 +417,81 @@ function processTaskList(
   }
 }
 
+function isInsideLinkContainer(
+  node: SyntaxNodeRef | null
+): boolean {
+  let current = node;
+  while (current) {
+    if (LINK_CONTAINER_NODES.has(current.name)) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function processBareUrlsInRange(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder,
+  from: number,
+  to: number
+) {
+  let line = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+
+  while (true) {
+    for (const match of line.text.matchAll(
+      new RegExp(BARE_URL_REGEX.source, BARE_URL_REGEX.flags)
+    )) {
+      const index = match.index ?? 0;
+      const fromPos = line.from + index;
+      const toPos = fromPos + match[0].length;
+      if (fromPos >= toPos) {
+        continue;
+      }
+      const node = tree.resolveInner(fromPos, 1);
+      if (isInsideLinkContainer(node)) {
+        continue;
+      }
+      builder.add(fromPos, toPos, linkDecoration);
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = view.state.doc.line(line.number + 1);
+  }
+}
+
+function processWikiLinksInRange(
+  view: EditorView,
+  builder: DecorationBuilder,
+  from: number,
+  to: number
+) {
+  let line = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+
+  while (true) {
+    for (const match of line.text.matchAll(
+      new RegExp(WIKI_LINK_REGEX.source, WIKI_LINK_REGEX.flags)
+    )) {
+      const index = match.index ?? 0;
+      const fromPos = line.from + index;
+      const toPos = fromPos + match[0].length;
+      if (fromPos + 2 >= toPos - 2) {
+        continue;
+      }
+      builder.add(fromPos + 2, toPos - 2, linkDecoration);
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = view.state.doc.line(line.number + 1);
+  }
+}
 
 // Main ViewPlugin for live preview
 class LivePreviewPlugin {
@@ -409,6 +511,7 @@ class LivePreviewPlugin {
     const decorations: { from: number; to: number; deco: Decoration }[] = [];
     const widgets: { pos: number; widget: WidgetType; side: number }[] = [];
 
+    const tree = syntaxTree(view.state);
     const builder: DecorationBuilder = {
       add: (from, to, deco) => {
         if (from < to) {
@@ -422,7 +525,7 @@ class LivePreviewPlugin {
 
     // Iterate through visible ranges for performance
     for (const { from, to } of view.visibleRanges) {
-      syntaxTree(view.state).iterate({
+      tree.iterate({
         from,
         to,
         enter: (node) => {
@@ -441,6 +544,10 @@ class LivePreviewPlugin {
               break;
             case "Link":
               processLink(node, view, builder);
+              break;
+            case "Autolink":
+            case "URL":
+              processAutolink(node, view, builder);
               break;
             case "Image":
               processImage(node, view, builder);
@@ -475,6 +582,8 @@ class LivePreviewPlugin {
           }
         },
       });
+      processBareUrlsInRange(view, tree, builder, from, to);
+      processWikiLinksInRange(view, builder, from, to);
     }
 
     // Process task lists (checkboxes) - not part of syntax tree iteration

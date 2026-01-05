@@ -14,7 +14,9 @@ import {
   defaultHighlightStyle,
   bracketMatching,
   indentOnInput,
+  syntaxTree,
 } from "@codemirror/language";
+import type { SyntaxNodeRef } from "@lezer/common";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { toast } from "sonner";
@@ -42,6 +44,7 @@ interface LivePreviewEditorProps {
   filePath?: string | null;
   vaultPath?: string | null;
   onSelectionChange?: (selection: SelectionInfo | null) => void;
+  onOpenNote?: (noteId: string) => void;
 }
 
 // Light theme for live preview editor
@@ -198,6 +201,245 @@ function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
+const BARE_URL_REGEX =
+  /(?:https?:\/\/|www\.)[^\s<>()]+|mailto:[^\s<>()]+/gi;
+const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
+
+function stripTrailingPunctuation(url: string): string {
+  let trimmed = url;
+  while (/[.,;:!?)]$/.test(trimmed)) {
+    if (trimmed.endsWith(")")) {
+      const openCount = (trimmed.match(/\(/g) ?? []).length;
+      const closeCount = (trimmed.match(/\)/g) ?? []).length;
+      if (closeCount <= openCount) {
+        break;
+      }
+    }
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed;
+}
+
+function normalizeLinkTarget(raw: string): string | null {
+  let url = raw.trim();
+  if (!url) {
+    return null;
+  }
+  if (url.startsWith("<") && url.endsWith(">")) {
+    url = url.slice(1, -1).trim();
+  }
+  const titleMatch = url.match(/^(\S+)\s+['"].*['"]$/);
+  if (titleMatch) {
+    url = titleMatch[1];
+  }
+  url = stripTrailingPunctuation(url);
+  if (!url) {
+    return null;
+  }
+  return url;
+}
+
+function coerceExternalUrl(raw: string): string | null {
+  const normalized = normalizeLinkTarget(raw);
+  if (!normalized) {
+    return null;
+  }
+  if (/^www\./i.test(normalized)) {
+    return `https://${normalized}`;
+  }
+  return normalized;
+}
+
+function coerceExternalUrlFromNormalized(normalized: string): string | null {
+  if (!normalized) {
+    return null;
+  }
+  if (/^www\./i.test(normalized)) {
+    return `https://${normalized}`;
+  }
+  return normalized;
+}
+
+function isAllowedExternalUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:", "mailto:"].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+type LinkTarget =
+  | { type: "external"; url: string }
+  | { type: "note"; noteId: string };
+
+function decodeIfEncoded(value: string): string {
+  if (!/%[0-9A-Fa-f]{2}/.test(value)) {
+    return value;
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizeNoteTitle(raw: string): string | null {
+  let title = raw.trim();
+  if (!title) {
+    return null;
+  }
+  title = decodeIfEncoded(title);
+  if (!title) {
+    return null;
+  }
+  return title;
+}
+
+function sanitizeNoteTitle(raw: string): string | null {
+  let title = raw.trim();
+  if (!title) {
+    return null;
+  }
+  const aliasSplit = title.split("|");
+  title = aliasSplit[0].trim();
+  if (!title) {
+    return null;
+  }
+  const hashIndex = title.indexOf("#");
+  if (hashIndex !== -1) {
+    title = title.slice(0, hashIndex).trim();
+  }
+  if (!title) {
+    return null;
+  }
+  if (title.toLowerCase().endsWith(".md")) {
+    title = title.slice(0, -3).trim();
+  }
+  if (!title) {
+    return null;
+  }
+  return normalizeNoteTitle(title);
+}
+
+function parseNoteTitleFromLinkTarget(raw: string): string | null {
+  const normalized = normalizeLinkTarget(raw);
+  if (!normalized) {
+    return null;
+  }
+  const noteMatch = normalized.match(/^note:(\/\/)?(.+)$/i);
+  if (noteMatch) {
+    return sanitizeNoteTitle(noteMatch[2]);
+  }
+  return null;
+}
+
+function buildNoteId(title: string): string {
+  return encodeURIComponent(title);
+}
+
+function findWikiLinkTarget(
+  lineText: string,
+  lineStart: number,
+  pos: number
+): string | null {
+  for (const match of lineText.matchAll(WIKI_LINK_REGEX)) {
+    const index = match.index ?? 0;
+    const from = lineStart + index;
+    const to = from + match[0].length;
+    if (pos < from || pos > to) {
+      continue;
+    }
+    const rawTitle = match[1];
+    const title = sanitizeNoteTitle(rawTitle);
+    if (!title) {
+      return null;
+    }
+    return buildNoteId(title);
+  }
+  return null;
+}
+
+function findLinkTargetAtPos(view: EditorView, pos: number): LinkTarget | null {
+  const tree = syntaxTree(view.state);
+  let node: SyntaxNodeRef | null = tree.resolveInner(pos, -1);
+
+  while (node) {
+    if (node.name === "Link") {
+      const text = view.state.doc.sliceString(node.from, node.to);
+      const match = text.match(/^\[([^\]]*)\]\(([^)]*)\)$/);
+      if (match) {
+        const noteTitle = parseNoteTitleFromLinkTarget(match[2]);
+        if (noteTitle) {
+          return { type: "note", noteId: buildNoteId(noteTitle) };
+        }
+        const normalized = normalizeLinkTarget(match[2]);
+        if (!normalized) {
+          return null;
+        }
+        const externalUrl = coerceExternalUrlFromNormalized(normalized);
+        if (!externalUrl) {
+          return null;
+        }
+        return { type: "external", url: externalUrl };
+      }
+    }
+
+    if (node.name === "Autolink" || node.name === "URL") {
+      const text = view.state.doc.sliceString(node.from, node.to);
+      const externalUrl = coerceExternalUrl(text);
+      if (!externalUrl) {
+        return null;
+      }
+      return { type: "external", url: externalUrl };
+    }
+
+    node = node.parent;
+  }
+
+  const line = view.state.doc.lineAt(pos);
+  const wikiTarget = findWikiLinkTarget(line.text, line.from, pos);
+  if (wikiTarget) {
+    return { type: "note", noteId: wikiTarget };
+  }
+  for (const match of line.text.matchAll(BARE_URL_REGEX)) {
+    const index = match.index ?? 0;
+    const from = line.from + index;
+    const to = from + match[0].length;
+    if (pos >= from && pos <= to) {
+      const externalUrl = coerceExternalUrl(match[0]);
+      if (!externalUrl) {
+        return null;
+      }
+      return { type: "external", url: externalUrl };
+    }
+  }
+
+  return null;
+}
+
+async function openExternalLink(url: string) {
+  if (!isAllowedExternalUrl(url)) {
+    toast.error("Unsupported link type");
+    return;
+  }
+  const api = getElectronAPI();
+  if (!api) {
+    if (typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener");
+    }
+    return;
+  }
+  try {
+    const result = await api.openExternal(url);
+    if (!result.success) {
+      toast.error(result.error || "Failed to open link");
+    }
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "Failed to open link");
+  }
+}
+
 function getClipboardImageFiles(data: DataTransfer | null): File[] {
   if (!data) {
     return [];
@@ -257,6 +499,7 @@ export function LivePreviewEditor({
   filePath = null,
   vaultPath = null,
   onSelectionChange,
+  onOpenNote,
 }: LivePreviewEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
@@ -267,6 +510,7 @@ export function LivePreviewEditor({
   const readOnlyRef = useRef(readOnly);
   const selectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onOpenNoteRef = useRef(onOpenNote);
 
   useEffect(() => {
     vaultPathRef.current = vaultPath;
@@ -279,6 +523,10 @@ export function LivePreviewEditor({
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
   }, [onSelectionChange]);
+
+  useEffect(() => {
+    onOpenNoteRef.current = onOpenNote;
+  }, [onOpenNote]);
 
   useEffect(() => {
     return () => {
@@ -402,6 +650,36 @@ export function LivePreviewEditor({
             return true;
           }
           void handlePasteImages(view, files);
+          return true;
+        },
+        click: (event, view) => {
+          const mouseEvent = event as MouseEvent;
+          if (mouseEvent.button !== 0) {
+            return false;
+          }
+          const pos = view.posAtCoords({
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+          });
+          if (pos == null) {
+            return false;
+          }
+          const linkTarget = findLinkTargetAtPos(view, pos);
+          if (!linkTarget) {
+            return false;
+          }
+          mouseEvent.preventDefault();
+          if (linkTarget.type === "note") {
+            if (onOpenNoteRef.current) {
+              onOpenNoteRef.current(linkTarget.noteId);
+              return true;
+            }
+            if (typeof window !== "undefined") {
+              window.location.hash = `#/notes/${linkTarget.noteId}`;
+            }
+            return true;
+          }
+          void openExternalLink(linkTarget.url);
           return true;
         },
       }),

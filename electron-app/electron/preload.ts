@@ -27,6 +27,7 @@ const api: ElectronAPI = {
   openFileDialog: () => ipcRenderer.invoke("file:open-dialog"),
   saveFileDialog: (defaultPath?: string) =>
     ipcRenderer.invoke("file:save-dialog", defaultPath),
+  openExternal: (url: string) => ipcRenderer.invoke("system:open-external", url),
 
   // Vault/Notes API
   selectVaultFolder: () => ipcRenderer.invoke("vault:select-folder"),

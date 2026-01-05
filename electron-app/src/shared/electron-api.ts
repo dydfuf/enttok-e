@@ -16,6 +16,11 @@ export type SaveDialogResult = {
   error?: string;
 };
 
+export type OpenExternalResult = {
+  success: boolean;
+  error?: string;
+};
+
 export type SelectFolderResult = {
   success: boolean;
   folderPath?: string;
@@ -186,6 +191,7 @@ export type ElectronAPI = {
   writeBinaryFile: (filePath: string, base64: string) => Promise<FileResult>;
   openFileDialog: () => Promise<OpenDialogResult | null>;
   saveFileDialog: (defaultPath?: string) => Promise<SaveDialogResult>;
+  openExternal: (url: string) => Promise<OpenExternalResult>;
   selectVaultFolder: () => Promise<SelectFolderResult>;
   listNotes: (folderPath: string) => Promise<ListNotesResult>;
   createNote: (folderPath: string, title: string) => Promise<CreateNoteResult>;

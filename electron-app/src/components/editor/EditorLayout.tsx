@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { LivePreviewEditor, type SelectionInfo } from "./LivePreviewEditor";
@@ -23,6 +24,7 @@ export function EditorLayout({
   onSaveRef,
   vaultPath,
 }: EditorLayoutProps) {
+  const navigate = useNavigate();
   const {
     filePath,
     content,
@@ -62,6 +64,13 @@ export function EditorLayout({
       }
     },
     [editorContext]
+  );
+
+  const handleOpenNote = useCallback(
+    (noteId: string) => {
+      navigate({ to: "/notes/$noteId", params: { noteId } });
+    },
+    [navigate]
   );
 
   // Expose save function to parent
@@ -146,6 +155,7 @@ export function EditorLayout({
           filePath={filePath}
           vaultPath={vaultPath}
           onSelectionChange={handleSelectionChange}
+          onOpenNote={handleOpenNote}
         />
       </div>
     </div>
