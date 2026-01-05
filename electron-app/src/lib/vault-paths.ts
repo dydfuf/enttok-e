@@ -1,15 +1,16 @@
 export const DEFAULT_ASSETS_FOLDER = "assets";
+export const DEFAULT_DAILY_FOLDER = "daily";
 
-type AssetsFolderValidation = {
+type VaultFolderValidation = {
   valid: boolean;
   normalized: string;
   error?: string;
 };
 
-export function validateAssetsFolder(
-  value: string | null | undefined
-): AssetsFolderValidation {
-  const fallback = DEFAULT_ASSETS_FOLDER;
+function validateVaultFolder(
+  value: string | null | undefined,
+  fallback: string
+): VaultFolderValidation {
   if (!value) {
     return { valid: true, normalized: fallback };
   }
@@ -42,6 +43,18 @@ export function validateAssetsFolder(
   }
 
   return { valid: true, normalized: segments.join("/") };
+}
+
+export function validateAssetsFolder(
+  value: string | null | undefined
+): VaultFolderValidation {
+  return validateVaultFolder(value, DEFAULT_ASSETS_FOLDER);
+}
+
+export function validateDailyFolder(
+  value: string | null | undefined
+): VaultFolderValidation {
+  return validateVaultFolder(value, DEFAULT_DAILY_FOLDER);
 }
 
 export function joinPath(base: string, ...parts: string[]): string {

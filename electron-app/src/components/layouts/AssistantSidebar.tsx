@@ -17,6 +17,7 @@ import type {
 import { getElectronAPI } from "@/lib/electron";
 import { ActivityStream } from "@/components/activity";
 import { useEditorOptional } from "@/contexts/EditorContext";
+import { useActivityStream } from "@/hooks/useActivityStream";
 
 export type ChatRole = "user" | "assistant";
 
@@ -84,6 +85,8 @@ export default function AssistantSidebar() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { activities, isLoading: isActivityLoading, refresh: refreshActivity } =
+    useActivityStream();
 
   const editorContext = useEditorOptional();
   const claudeAPI = useMemo<ClaudeAPI | null>(() => getElectronAPI(), []);
@@ -262,7 +265,13 @@ export default function AssistantSidebar() {
           />
         )}
 
-        {activeTab === "activity" && <ActivityStream activities={[]} />}
+        {activeTab === "activity" && (
+          <ActivityStream
+            activities={activities}
+            isLoading={isActivityLoading}
+            onRefresh={refreshActivity}
+          />
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

@@ -7,6 +7,7 @@ import {
   mkdir,
 } from "fs/promises";
 import path from "path";
+import { getDailyNotesFolder, getDailyNoteTemplate } from "./store.js";
 
 export interface FileResult {
   success: boolean;
@@ -247,8 +248,49 @@ export async function getNotePath(
 
 // ========== Daily Notes Functions ==========
 
+const DEFAULT_DAILY_FOLDER = "daily";
+const DATE_PLACEHOLDER = /\{\{\s*date\s*\}\}/g;
+
+function resolveDailyFolderSegments(): string[] {
+  const stored = getDailyNotesFolder();
+  if (!stored) {
+    return [DEFAULT_DAILY_FOLDER];
+  }
+
+  const normalized = stored.trim().replace(/\\/g, "/");
+  if (!normalized) {
+    return [DEFAULT_DAILY_FOLDER];
+  }
+
+  if (normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) {
+    return [DEFAULT_DAILY_FOLDER];
+  }
+
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length === 0) {
+    return [DEFAULT_DAILY_FOLDER];
+  }
+
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    return [DEFAULT_DAILY_FOLDER];
+  }
+
+  return segments;
+}
+
+function getDailyFolderPath(vaultPath: string): string {
+  return path.join(vaultPath, ...resolveDailyFolderSegments());
+}
+
+function applyDailyTemplate(template: string, date: string): string {
+  if (!template) {
+    return "";
+  }
+  return template.replace(DATE_PLACEHOLDER, date);
+}
+
 export function getDailyNotePath(vaultPath: string, date: string): string {
-  return path.join(vaultPath, "daily", `${date}.md`);
+  return path.join(getDailyFolderPath(vaultPath), `${date}.md`);
 }
 
 export interface DailyNoteResult {
@@ -262,7 +304,7 @@ export async function createDailyNote(
   date: string
 ): Promise<DailyNoteResult> {
   try {
-    const dailyDir = path.join(vaultPath, "daily");
+    const dailyDir = getDailyFolderPath(vaultPath);
     await mkdir(dailyDir, { recursive: true });
 
     const filePath = getDailyNotePath(vaultPath, date);
@@ -277,7 +319,8 @@ export async function createDailyNote(
     }
 
     // Create with template
-    const content = `# ${date}\n\n## Tasks\n\n- [ ] \n\n## Notes\n\n`;
+    const template = getDailyNoteTemplate();
+    const content = applyDailyTemplate(template, date);
     await fsWriteFile(filePath, content, "utf-8");
 
     return { success: true, filePath };
@@ -300,7 +343,7 @@ export async function listDailyNoteDates(
   vaultPath: string
 ): Promise<DailyNoteDatesResult> {
   try {
-    const dailyDir = path.join(vaultPath, "daily");
+    const dailyDir = getDailyFolderPath(vaultPath);
 
     try {
       await stat(dailyDir);

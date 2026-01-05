@@ -57,6 +57,13 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("store:get-daily-calendar-collapsed"),
   setDailyCalendarCollapsed: (collapsed: boolean) =>
     ipcRenderer.invoke("store:set-daily-calendar-collapsed", collapsed),
+  getDailyNotesFolder: () => ipcRenderer.invoke("store:get-daily-notes-folder"),
+  setDailyNotesFolder: (folder: string) =>
+    ipcRenderer.invoke("store:set-daily-notes-folder", folder),
+  getDailyNoteTemplate: () =>
+    ipcRenderer.invoke("store:get-daily-note-template"),
+  setDailyNoteTemplate: (template: string) =>
+    ipcRenderer.invoke("store:set-daily-note-template", template),
   getAssetsFolder: () => ipcRenderer.invoke("store:get-assets-folder"),
   setAssetsFolder: (folder: string) =>
     ipcRenderer.invoke("store:set-assets-folder", folder),

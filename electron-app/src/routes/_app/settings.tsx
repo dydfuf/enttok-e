@@ -26,8 +26,10 @@ import { FolderOpen, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
 	DEFAULT_ASSETS_FOLDER,
+	DEFAULT_DAILY_FOLDER,
 	joinPath,
 	validateAssetsFolder,
+	validateDailyFolder,
 } from "@/lib/vault-paths";
 import type { RuntimeBinaryStatus, RuntimeStatus } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
@@ -61,6 +63,24 @@ const STATUS_CLASSES: Record<string, string> = {
 	error: "bg-red-500",
 };
 
+const DEFAULT_DAILY_NOTE_TEMPLATE = `---
+date: {{date}}
+tags: [daily]
+---
+
+# {{date}}
+
+## Today's Tasks
+
+-
+
+## Tomorrow's Plan
+
+-
+
+## Notes
+`;
+
 function formatRuntimeLabel(status: RuntimeBinaryStatus | null) {
 	if (!status) {
 		return "Checking";
@@ -77,18 +97,34 @@ function SettingsPage() {
 	const { vaultPath, selectVault, closeVault } = useVault();
 	const { state, logs, health } = useBackend();
 	const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
+	const [dailyFolder, setDailyFolder] = useState(DEFAULT_DAILY_FOLDER);
+	const [dailyFolderInput, setDailyFolderInput] = useState(
+		DEFAULT_DAILY_FOLDER,
+	);
 	const [assetsFolder, setAssetsFolder] = useState(DEFAULT_ASSETS_FOLDER);
 	const [assetsFolderInput, setAssetsFolderInput] = useState(
 		DEFAULT_ASSETS_FOLDER,
 	);
+	const [dailyTemplate, setDailyTemplate] = useState(
+		DEFAULT_DAILY_NOTE_TEMPLATE,
+	);
+	const [dailyTemplateInput, setDailyTemplateInput] = useState(
+		DEFAULT_DAILY_NOTE_TEMPLATE,
+	);
 
 	const lastLogs = useMemo(() => logs.slice(-10), [logs]);
+	const dailyFolderValidation = useMemo(
+		() => validateDailyFolder(dailyFolderInput),
+		[dailyFolderInput],
+	);
+	const dailyFolderDirty = dailyFolderValidation.normalized !== dailyFolder;
 	const assetsFolderValidation = useMemo(
 		() => validateAssetsFolder(assetsFolderInput),
 		[assetsFolderInput],
 	);
 	const assetsFolderDirty =
 		assetsFolderValidation.normalized !== assetsFolder;
+	const dailyTemplateDirty = dailyTemplateInput !== dailyTemplate;
 	const status = state?.status ?? "stopped";
 	const statusLabel = STATUS_LABELS[status] ?? status;
 	const statusClass = STATUS_CLASSES[status] ?? STATUS_CLASSES.stopped;
@@ -139,6 +175,28 @@ function SettingsPage() {
 		}
 		let mounted = true;
 		api
+			.getDailyNotesFolder()
+			.then((value) => {
+				if (!mounted) {
+					return;
+				}
+				const validation = validateDailyFolder(value);
+				setDailyFolder(validation.normalized);
+				setDailyFolderInput(validation.normalized);
+			})
+			.catch(() => undefined);
+		return () => {
+			mounted = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		let mounted = true;
+		api
 			.getAssetsFolder()
 			.then((value) => {
 				if (!mounted) {
@@ -154,8 +212,39 @@ function SettingsPage() {
 		};
 	}, []);
 
-	const handleSaveTemplate = () => {
-		toast.success("Template saved successfully!");
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		let mounted = true;
+		api
+			.getDailyNoteTemplate()
+			.then((value) => {
+				if (!mounted) {
+					return;
+				}
+				setDailyTemplate(value);
+				setDailyTemplateInput(value);
+			})
+			.catch(() => undefined);
+		return () => {
+			mounted = false;
+		};
+	}, []);
+
+	const handleSaveTemplate = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		try {
+			await api.setDailyNoteTemplate(dailyTemplateInput);
+			setDailyTemplate(dailyTemplateInput);
+			toast.success("Template saved successfully!");
+		} catch {
+			toast.error("Failed to save template");
+		}
 	};
 
 	const handleChangeVault = async () => {
@@ -168,6 +257,23 @@ function SettingsPage() {
 	const handleCloseVault = async () => {
 		await closeVault();
 		navigate({ to: "/" });
+	};
+
+	const handleSaveDailyFolder = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		if (!dailyFolderValidation.valid) {
+			toast.error(
+				dailyFolderValidation.error || "Invalid daily notes folder",
+			);
+			return;
+		}
+		await api.setDailyNotesFolder(dailyFolderValidation.normalized);
+		setDailyFolder(dailyFolderValidation.normalized);
+		setDailyFolderInput(dailyFolderValidation.normalized);
+		toast.success("Daily notes folder updated");
 	};
 
 	const handleSaveAssetsFolder = async () => {
@@ -235,6 +341,54 @@ function SettingsPage() {
 											Close Vault
 										</Button>
 									</div>
+								</CardContent>
+							</Card>
+							<Card>
+								<CardHeader>
+									<CardTitle>Daily Notes</CardTitle>
+									<CardDescription>
+										Choose where daily notes are stored
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-3">
+									<div>
+										<Label className="text-muted-foreground mb-1">
+											Daily Notes Folder
+										</Label>
+										<Input
+											value={dailyFolderInput}
+											onChange={(e) => setDailyFolderInput(e.target.value)}
+											placeholder={DEFAULT_DAILY_FOLDER}
+										/>
+										<p className="text-xs text-muted-foreground mt-2">
+											Relative to the vault root. Example: daily or
+											journal/daily.
+										</p>
+										{!dailyFolderValidation.valid && (
+											<p className="text-xs text-destructive mt-2">
+												{dailyFolderValidation.error}
+											</p>
+										)}
+									</div>
+									<div>
+										<Label className="text-muted-foreground mb-1">
+											Resolved Path
+										</Label>
+										<p className="text-sm font-mono bg-muted p-2 rounded mt-1 break-all">
+											{vaultPath
+												? joinPath(vaultPath, dailyFolder)
+												: "No vault selected"}
+										</p>
+									</div>
+									<Button
+										onClick={handleSaveDailyFolder}
+										disabled={
+											!dailyFolderDirty ||
+											!dailyFolderValidation.valid
+										}
+									>
+										Save Daily Notes Folder
+									</Button>
 								</CardContent>
 							</Card>
 							<Card>
@@ -323,25 +477,15 @@ function SettingsPage() {
 							<CardContent className="space-y-3">
 								<Textarea
 									className="font-mono min-h-[150px]"
-									defaultValue={`---
-date: {{date}}
-tags: [daily]
----
-
-# {{date}}
-
-## Today's Tasks
-
--
-
-## Tomorrow's Plan
-
--
-
-## Notes
-`}
+									value={dailyTemplateInput}
+									onChange={(e) => setDailyTemplateInput(e.target.value)}
 								/>
-								<Button onClick={handleSaveTemplate}>Save Template</Button>
+								<Button
+									onClick={handleSaveTemplate}
+									disabled={!dailyTemplateDirty}
+								>
+									Save Template
+								</Button>
 							</CardContent>
 						</Card>
 					</TabsContent>

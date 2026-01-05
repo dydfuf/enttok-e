@@ -21,6 +21,10 @@ import {
   removeFromRecentVaults,
   getDailyCalendarCollapsed,
   setDailyCalendarCollapsed,
+  getDailyNotesFolder,
+  setDailyNotesFolder,
+  getDailyNoteTemplate,
+  setDailyNoteTemplate,
   getAssetsFolder,
   setAssetsFolder,
 } from "../store.js";
@@ -94,6 +98,18 @@ export function registerIpcHandlers() {
   );
   ipcMain.handle("store:set-daily-calendar-collapsed", (_, collapsed: boolean) => {
     setDailyCalendarCollapsed(collapsed);
+    return { success: true };
+  });
+  ipcMain.handle("store:get-daily-notes-folder", () => getDailyNotesFolder());
+  ipcMain.handle("store:set-daily-notes-folder", (_, folder: string) => {
+    setDailyNotesFolder(folder);
+    return { success: true };
+  });
+  ipcMain.handle("store:get-daily-note-template", () =>
+    getDailyNoteTemplate()
+  );
+  ipcMain.handle("store:set-daily-note-template", (_, template: string) => {
+    setDailyNoteTemplate(template);
     return { success: true };
   });
   ipcMain.handle("store:get-assets-folder", () => getAssetsFolder());

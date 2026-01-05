@@ -202,6 +202,10 @@ export type ElectronAPI = {
   setDailyCalendarCollapsed: (
     collapsed: boolean
   ) => Promise<{ success: boolean }>;
+  getDailyNotesFolder: () => Promise<string>;
+  setDailyNotesFolder: (folder: string) => Promise<{ success: boolean }>;
+  getDailyNoteTemplate: () => Promise<string>;
+  setDailyNoteTemplate: (template: string) => Promise<{ success: boolean }>;
   getAssetsFolder: () => Promise<string>;
   setAssetsFolder: (folder: string) => Promise<{ success: boolean }>;
   startBackend: () => Promise<BackendState>;

@@ -12,8 +12,28 @@ interface StoreSchema {
   recentVaults: VaultInfo[];
   maxRecentVaults: number;
   dailyCalendarCollapsed: boolean;
+  dailyNotesFolder: string;
+  dailyNoteTemplate: string;
   assetsFolder: string;
 }
+
+const DEFAULT_DAILY_NOTE_TEMPLATE = `---
+date: {{date}}
+tags: [daily]
+---
+
+# {{date}}
+
+## Today's Tasks
+
+-
+
+## Tomorrow's Plan
+
+-
+
+## Notes
+`;
 
 const store = new Store<StoreSchema>({
   name: "enttok-config",
@@ -22,6 +42,8 @@ const store = new Store<StoreSchema>({
     recentVaults: [],
     maxRecentVaults: 10,
     dailyCalendarCollapsed: true,
+    dailyNotesFolder: "daily",
+    dailyNoteTemplate: DEFAULT_DAILY_NOTE_TEMPLATE,
     assetsFolder: "assets",
   },
 });
@@ -70,6 +92,22 @@ export function getDailyCalendarCollapsed(): boolean {
 
 export function setDailyCalendarCollapsed(collapsed: boolean): void {
   store.set("dailyCalendarCollapsed", collapsed);
+}
+
+export function getDailyNotesFolder(): string {
+  return store.get("dailyNotesFolder");
+}
+
+export function setDailyNotesFolder(folder: string): void {
+  store.set("dailyNotesFolder", folder);
+}
+
+export function getDailyNoteTemplate(): string {
+  return store.get("dailyNoteTemplate");
+}
+
+export function setDailyNoteTemplate(template: string): void {
+  store.set("dailyNoteTemplate", template);
 }
 
 export function getAssetsFolder(): string {
