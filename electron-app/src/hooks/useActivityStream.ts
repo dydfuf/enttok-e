@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNow, isValid, parseISO, subHours } from "date-fns";
 import { useGitHub } from "@/contexts/GitHubContext";
+import { useActivityEvents } from "@/hooks/useActivityEvents";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import type { CalendarEvent } from "@/lib/calendar-api";
 import type { ActivityItemData } from "@/components/activity";
@@ -82,6 +83,17 @@ export function useActivityStream(): ActivityStreamState {
 		end: rangeEnd,
 		selectedOnly: true,
 	});
+	const {
+		events: activityEvents,
+		isLoading: activityLoading,
+		error: activityError,
+		reload: reloadActivity,
+	} = useActivityEvents({
+		start: rangeStart,
+		end: rangeEnd,
+		sources: ["jira", "confluence"],
+		limit: MAX_ACTIVITY_ITEMS,
+	});
 
 	useEffect(() => {
 		if (status?.cli.found && status.auth.authenticated && !summary) {
@@ -95,8 +107,9 @@ export function useActivityStream(): ActivityStreamState {
 			refreshGitHub(),
 			refreshSummary(),
 			reloadCalendar(),
+			reloadActivity(),
 		]);
-	}, [refreshGitHub, refreshSummary, reloadCalendar]);
+	}, [refreshGitHub, refreshSummary, reloadActivity, reloadCalendar]);
 
 	const calendarEntries = useMemo<ActivityEntry[]>(() => {
 		return events
@@ -181,16 +194,48 @@ export function useActivityStream(): ActivityStreamState {
 		return entries;
 	}, [summary, rangeEnd, rangeStart]);
 
+	const atlassianEntries = useMemo<ActivityEntry[]>(() => {
+		const sourceLabels: Record<string, string> = {
+			jira: "Jira",
+			confluence: "Confluence",
+		};
+
+		return activityEvents
+			.map((event) => {
+				const timestamp = toTimestamp(event.event_time);
+				if (!timestamp) return null;
+				const descriptionParts = [];
+				if (event.actor) {
+					descriptionParts.push(event.actor);
+				}
+				if (event.description) {
+					descriptionParts.push(event.description);
+				}
+				const description = descriptionParts.join(" | ") || "Activity";
+
+				return {
+					id: `atlassian:${event.source}:${event.id}`,
+					title: event.title,
+					description,
+					source: event.source as ActivityItemData["source"],
+					sourceLabel: sourceLabels[event.source] || "Atlassian",
+					time: formatRelativeTime(timestamp),
+					timestamp,
+				};
+			})
+			.filter((entry): entry is ActivityEntry => Boolean(entry));
+	}, [activityEvents]);
+
 	const activities = useMemo<ActivityItemData[]>(() => {
-		const entries = [...calendarEntries, ...gitHubEntries];
+		const entries = [...calendarEntries, ...gitHubEntries, ...atlassianEntries];
 		entries.sort((a, b) => b.timestamp - a.timestamp);
 		return entries.slice(0, MAX_ACTIVITY_ITEMS).map(({ timestamp, ...rest }) => rest);
-	}, [calendarEntries, gitHubEntries]);
+	}, [calendarEntries, gitHubEntries, atlassianEntries]);
 
 	return {
 		activities,
-		isLoading: gitHubLoading || calendarLoading,
-		error: gitHubError || calendarError,
+		isLoading: gitHubLoading || calendarLoading || activityLoading,
+		error: gitHubError || calendarError || activityError,
 		refresh,
 	};
 }

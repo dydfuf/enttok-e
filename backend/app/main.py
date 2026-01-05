@@ -11,11 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 _backend_dir = Path(__file__).resolve().parent.parent
 load_dotenv(_backend_dir / ".env")
 
-from app.api import calendar, claude, events, health, jobs, status
+from app.api import activity, calendar, claude, confluence, events, health, jira, jobs, status
 from app.core.config import ensure_dirs
 from app.core.logging import configure_logging
 from app.db.connection import close_db, connect_db
 from app.services.jobs import start_workers
+from app.services.scheduler import start_scheduler
 from app.websocket.manager import manager
 
 
@@ -46,11 +47,15 @@ def create_app() -> FastAPI:
     app.include_router(claude.router)
     app.include_router(events.router)
     app.include_router(calendar.router)
+    app.include_router(jira.router)
+    app.include_router(confluence.router)
+    app.include_router(activity.router)
 
     @app.on_event("startup")
     async def on_startup() -> None:
         await connect_db()
         await start_workers()
+        await start_scheduler()
         await manager.emit_log("info", "backend started")
 
     @app.on_event("shutdown")

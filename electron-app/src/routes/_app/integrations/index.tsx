@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarDays, Github, Slack, SquareKanban } from "lucide-react";
+import { CalendarDays, FileText, Github, Slack, SquareKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useGitHub } from "@/contexts/GitHubContext";
+import { useAtlassian } from "@/hooks/useAtlassian";
 
 export const Route = createFileRoute("/_app/integrations/")({
 	component: IntegrationsIndexPage,
@@ -16,9 +17,15 @@ export const Route = createFileRoute("/_app/integrations/")({
 
 function IntegrationsIndexPage() {
 	const { status } = useGitHub();
+	const jira = useAtlassian("jira");
+	const confluence = useAtlassian("confluence");
 
 	const isGitHubConnected =
 		status?.cli.found === true && status?.auth.authenticated === true;
+	const jiraAccount = jira.accounts[0];
+	const confluenceAccount = confluence.accounts[0];
+	const isJiraConnected = Boolean(jiraAccount);
+	const isConfluenceConnected = Boolean(confluenceAccount);
 
 	const integrations = [
 		{
@@ -51,10 +58,22 @@ function IntegrationsIndexPage() {
 		{
 			id: "jira",
 			name: "Jira",
-			description: "Coming soon - Sync issues and sprints",
+			description: isJiraConnected
+				? `Connected to ${jiraAccount?.org}.atlassian.net`
+				: "Sync issues, comments, and status changes",
 			icon: SquareKanban,
-			connected: false,
-			disabled: true,
+			connected: isJiraConnected,
+			route: "/integrations/jira",
+		},
+		{
+			id: "confluence",
+			name: "Confluence",
+			description: isConfluenceConnected
+				? `Connected to ${confluenceAccount?.org}.atlassian.net`
+				: "Sync pages, updates, and comments",
+			icon: FileText,
+			connected: isConfluenceConnected,
+			route: "/integrations/confluence",
 		},
 	];
 

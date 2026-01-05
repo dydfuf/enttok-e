@@ -24,7 +24,9 @@ import { Route as AppIntegrationsIndexRouteImport } from './routes/_app/integrat
 import { Route as AppDailyIndexRouteImport } from './routes/_app/daily.index'
 import { Route as AppTagsTagRouteImport } from './routes/_app/tags/$tag'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes/$noteId'
+import { Route as AppIntegrationsJiraRouteImport } from './routes/_app/integrations/jira'
 import { Route as AppIntegrationsGithubRouteImport } from './routes/_app/integrations/github'
+import { Route as AppIntegrationsConfluenceRouteImport } from './routes/_app/integrations/confluence'
 import { Route as AppIntegrationsCalendarRouteImport } from './routes/_app/integrations/calendar'
 import { Route as AppDailyDateRouteImport } from './routes/_app/daily.$date'
 
@@ -102,11 +104,22 @@ const AppNotesNoteIdRoute = AppNotesNoteIdRouteImport.update({
   path: '/$noteId',
   getParentRoute: () => AppNotesRoute,
 } as any)
+const AppIntegrationsJiraRoute = AppIntegrationsJiraRouteImport.update({
+  id: '/jira',
+  path: '/jira',
+  getParentRoute: () => AppIntegrationsRoute,
+} as any)
 const AppIntegrationsGithubRoute = AppIntegrationsGithubRouteImport.update({
   id: '/github',
   path: '/github',
   getParentRoute: () => AppIntegrationsRoute,
 } as any)
+const AppIntegrationsConfluenceRoute =
+  AppIntegrationsConfluenceRouteImport.update({
+    id: '/confluence',
+    path: '/confluence',
+    getParentRoute: () => AppIntegrationsRoute,
+  } as any)
 const AppIntegrationsCalendarRoute = AppIntegrationsCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -129,7 +142,9 @@ export interface FileRoutesByFullPath {
   '/tags': typeof AppTagsRouteWithChildren
   '/daily/$date': typeof AppDailyDateRoute
   '/integrations/calendar': typeof AppIntegrationsCalendarRoute
+  '/integrations/confluence': typeof AppIntegrationsConfluenceRoute
   '/integrations/github': typeof AppIntegrationsGithubRoute
+  '/integrations/jira': typeof AppIntegrationsJiraRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/tags/$tag': typeof AppTagsTagRoute
   '/daily/': typeof AppDailyIndexRoute
@@ -144,7 +159,9 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/daily/$date': typeof AppDailyDateRoute
   '/integrations/calendar': typeof AppIntegrationsCalendarRoute
+  '/integrations/confluence': typeof AppIntegrationsConfluenceRoute
   '/integrations/github': typeof AppIntegrationsGithubRoute
+  '/integrations/jira': typeof AppIntegrationsJiraRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/tags/$tag': typeof AppTagsTagRoute
   '/daily': typeof AppDailyIndexRoute
@@ -165,7 +182,9 @@ export interface FileRoutesById {
   '/_app/tags': typeof AppTagsRouteWithChildren
   '/_app/daily/$date': typeof AppDailyDateRoute
   '/_app/integrations/calendar': typeof AppIntegrationsCalendarRoute
+  '/_app/integrations/confluence': typeof AppIntegrationsConfluenceRoute
   '/_app/integrations/github': typeof AppIntegrationsGithubRoute
+  '/_app/integrations/jira': typeof AppIntegrationsJiraRoute
   '/_app/notes/$noteId': typeof AppNotesNoteIdRoute
   '/_app/tags/$tag': typeof AppTagsTagRoute
   '/_app/daily/': typeof AppDailyIndexRoute
@@ -186,7 +205,9 @@ export interface FileRouteTypes {
     | '/tags'
     | '/daily/$date'
     | '/integrations/calendar'
+    | '/integrations/confluence'
     | '/integrations/github'
+    | '/integrations/jira'
     | '/notes/$noteId'
     | '/tags/$tag'
     | '/daily/'
@@ -201,7 +222,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/daily/$date'
     | '/integrations/calendar'
+    | '/integrations/confluence'
     | '/integrations/github'
+    | '/integrations/jira'
     | '/notes/$noteId'
     | '/tags/$tag'
     | '/daily'
@@ -221,7 +244,9 @@ export interface FileRouteTypes {
     | '/_app/tags'
     | '/_app/daily/$date'
     | '/_app/integrations/calendar'
+    | '/_app/integrations/confluence'
     | '/_app/integrations/github'
+    | '/_app/integrations/jira'
     | '/_app/notes/$noteId'
     | '/_app/tags/$tag'
     | '/_app/daily/'
@@ -342,11 +367,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNotesNoteIdRouteImport
       parentRoute: typeof AppNotesRoute
     }
+    '/_app/integrations/jira': {
+      id: '/_app/integrations/jira'
+      path: '/jira'
+      fullPath: '/integrations/jira'
+      preLoaderRoute: typeof AppIntegrationsJiraRouteImport
+      parentRoute: typeof AppIntegrationsRoute
+    }
     '/_app/integrations/github': {
       id: '/_app/integrations/github'
       path: '/github'
       fullPath: '/integrations/github'
       preLoaderRoute: typeof AppIntegrationsGithubRouteImport
+      parentRoute: typeof AppIntegrationsRoute
+    }
+    '/_app/integrations/confluence': {
+      id: '/_app/integrations/confluence'
+      path: '/confluence'
+      fullPath: '/integrations/confluence'
+      preLoaderRoute: typeof AppIntegrationsConfluenceRouteImport
       parentRoute: typeof AppIntegrationsRoute
     }
     '/_app/integrations/calendar': {
@@ -382,13 +421,17 @@ const AppDailyRouteWithChildren = AppDailyRoute._addFileChildren(
 
 interface AppIntegrationsRouteChildren {
   AppIntegrationsCalendarRoute: typeof AppIntegrationsCalendarRoute
+  AppIntegrationsConfluenceRoute: typeof AppIntegrationsConfluenceRoute
   AppIntegrationsGithubRoute: typeof AppIntegrationsGithubRoute
+  AppIntegrationsJiraRoute: typeof AppIntegrationsJiraRoute
   AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
 }
 
 const AppIntegrationsRouteChildren: AppIntegrationsRouteChildren = {
   AppIntegrationsCalendarRoute: AppIntegrationsCalendarRoute,
+  AppIntegrationsConfluenceRoute: AppIntegrationsConfluenceRoute,
   AppIntegrationsGithubRoute: AppIntegrationsGithubRoute,
+  AppIntegrationsJiraRoute: AppIntegrationsJiraRoute,
   AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,
 }
 

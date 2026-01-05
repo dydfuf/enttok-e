@@ -6,6 +6,8 @@ from app.core.config import BACKEND_WORKERS
 from app.db import jobs_repo
 from app.services.calendar import run_calendar_sync_job
 from app.services.claude import run_claude_job
+from app.services.confluence import run_confluence_sync_job
+from app.services.jira import run_jira_sync_job
 from app.websocket.manager import manager
 
 job_queue: asyncio.Queue[str] = asyncio.Queue()
@@ -35,6 +37,12 @@ async def process_job(job_id: str) -> None:
 
     if job["type"] == "connector.calendar.sync":
         await run_calendar_sync_job(job_id, job.get("payload", {}))
+        return
+    if job["type"] == "connector.jira.sync":
+        await run_jira_sync_job(job_id, job.get("payload", {}))
+        return
+    if job["type"] == "connector.confluence.sync":
+        await run_confluence_sync_job(job_id, job.get("payload", {}))
         return
 
     await jobs_repo.update_job(job_id, status="running", progress=0.0)
@@ -105,4 +113,3 @@ def status_snapshot() -> Dict[str, Any]:
         },
         "scheduler": {"running": False, "jobs": 0},
     }
-

@@ -109,6 +109,63 @@ def init_db(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         """
+        create table if not exists atlassian_accounts (
+          account_id text primary key,
+          service text not null,
+          org text not null,
+          base_url text not null,
+          email text not null,
+          api_token text not null,
+          created_at text not null,
+          updated_at text not null
+        );
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_atlassian_accounts_service
+        on atlassian_accounts (service);
+        """
+    )
+    conn.execute(
+        """
+        create table if not exists activity_events (
+          event_id text primary key,
+          source text not null,
+          account_id text not null,
+          event_type text not null,
+          title text not null,
+          description text,
+          url text,
+          actor text,
+          event_time text not null,
+          event_ts integer not null,
+          created_at text not null,
+          updated_at text not null,
+          raw_json text
+        );
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_activity_events_time
+        on activity_events (event_ts);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_activity_events_source
+        on activity_events (source);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_activity_events_account
+        on activity_events (account_id);
+        """
+    )
+    conn.execute(
+        """
         create index if not exists idx_calendar_events_range
         on calendar_events (start_ts, end_ts);
         """
