@@ -408,7 +408,7 @@ type GitRemoteInfo = {
 const MAX_COMMITS_PER_REPO = 200;
 
 let cachedGitAvailable: boolean | null = null;
-let cachedGlobalGitIdentity: { name: string | null; email: string | null } | null = null;
+let cachedGlobalGitName: string | null | undefined = undefined;
 
 async function execGit(
   args: string[],
@@ -455,48 +455,29 @@ async function getGitConfigValue(
   return value.length > 0 ? value : null;
 }
 
-async function getGlobalGitIdentity(): Promise<{ name: string | null; email: string | null }> {
-  if (cachedGlobalGitIdentity) {
-    return cachedGlobalGitIdentity;
+async function getGlobalGitName(): Promise<string | null> {
+  if (cachedGlobalGitName !== undefined) {
+    return cachedGlobalGitName;
   }
 
-  const [emailResult, nameResult] = await Promise.all([
-    execGit(["config", "--global", "--get", "user.email"]),
-    execGit(["config", "--global", "--get", "user.name"]),
-  ]);
+  const result = await execGit(["config", "--global", "--get", "user.name"]);
+  cachedGlobalGitName = result.success && result.data ? result.data.trim() : null;
 
-  cachedGlobalGitIdentity = {
-    email: emailResult.success && emailResult.data ? emailResult.data.trim() : null,
-    name: nameResult.success && nameResult.data ? nameResult.data.trim() : null,
-  };
-
-  if (cachedGlobalGitIdentity.email === "") {
-    cachedGlobalGitIdentity.email = null;
-  }
-  if (cachedGlobalGitIdentity.name === "") {
-    cachedGlobalGitIdentity.name = null;
+  if (cachedGlobalGitName === "") {
+    cachedGlobalGitName = null;
   }
 
-  return cachedGlobalGitIdentity;
+  return cachedGlobalGitName;
 }
 
 async function getRepoAuthorPattern(repoPath: string): Promise<string | null> {
-  const [repoEmail, repoName] = await Promise.all([
-    getGitConfigValue(repoPath, "user.email"),
-    getGitConfigValue(repoPath, "user.name"),
-  ]);
+  let name = await getGitConfigValue(repoPath, "user.name");
 
-  let email = repoEmail;
-  let name = repoName;
-
-  if (!email || !name) {
-    const globalIdentity = await getGlobalGitIdentity();
-    email = email || globalIdentity.email;
-    name = name || globalIdentity.name;
+  if (!name) {
+    name = await getGlobalGitName();
   }
 
-  const parts = [email, name].filter(Boolean).map(escapeGitAuthorPattern);
-  return parts.length > 0 ? parts.join("|") : null;
+  return name ? escapeGitAuthorPattern(name) : null;
 }
 
 async function isGitRepo(repoPath: string): Promise<boolean> {
@@ -576,7 +557,7 @@ function parseGitLog(
   return commits;
 }
 
-async function getLocalCommits(dateStr: string): Promise<GitHubCommit[]> {
+async function getLocalCommits(): Promise<GitHubCommit[]> {
   const repoPaths = getGitHubRepoPaths();
   if (repoPaths.length === 0) {
     return [];
@@ -607,7 +588,7 @@ async function getLocalCommits(dateStr: string): Promise<GitHubCommit[]> {
         "-C",
         repoPath,
         "log",
-        `--since=${dateStr}`,
+        "--all",
         "--pretty=format:%H%x1f%aI%x1f%s",
         "--max-count",
         String(MAX_COMMITS_PER_REPO),
@@ -648,7 +629,7 @@ export async function getGitHubDailySummary(
     auth.authenticated && auth.username
       ? await getTodayPRs(dateStr)
       : { authored: [], reviewed: [] };
-  const commits = await getLocalCommits(dateStr);
+  const commits = await getLocalCommits();
 
   return {
     date: dateStr,
