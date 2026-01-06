@@ -83,10 +83,17 @@ function VaultSelectPage() {
             <ul className="space-y-2">
               {recentVaults.map((vault) => (
                 <li key={vault.path}>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleSelectRecentVault(vault.path)}
-                    className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-left"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleSelectRecentVault(vault.path);
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-left cursor-pointer"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -103,7 +110,7 @@ function VaultSelectPage() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
-                  </button>
+                  </div>
                 </li>
               ))}
             </ul>
