@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__ide__getDiagnostics",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm lint:check:*)",
+      "Bash(pnpm tsc:*)"
     ]
   }
 }

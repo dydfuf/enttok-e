@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Bot, FileText, History, Loader2, Plus, X } from "lucide-react";
+import { Activity, Bot, FileText, History, Loader2, Plus, X } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,7 @@ import type {
   ElectronAPI,
 } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
-import { ActivityStream } from "@/components/activity";
+import { ActivityStream, type ActivityItemData } from "@/components/activity";
 import { useEditorOptional } from "@/contexts/EditorContext";
 import { useActivityStream } from "@/hooks/useActivityStream";
 
@@ -39,19 +39,36 @@ type ClaudeAPI = Pick<
 
 const MAX_SELECTION_CHARS = 2000;
 const MAX_NOTE_CONTEXT_CHARS = 4000;
+const MAX_ACTIVITY_CONTEXT_CHARS = 4000;
 
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + "...";
 }
 
+function formatActivitiesAsContext(activities: ActivityItemData[]): string {
+  if (activities.length === 0) return "";
+
+  const lines = activities.map((activity) => {
+    return `- [${activity.sourceLabel}] ${activity.title} (${activity.time})\n  ${activity.description}`;
+  });
+
+  return lines.join("\n");
+}
+
 function buildPromptWithContext(
   userPrompt: string,
   selectedText: string | null,
   noteContent: string | null,
-  includeNoteContext: boolean
+  includeNoteContext: boolean,
+  activityContext: string | null
 ): string {
   const parts: string[] = [];
+
+  if (activityContext) {
+    const truncated = truncateText(activityContext, MAX_ACTIVITY_CONTEXT_CHARS);
+    parts.push(`[Recent Activity Stream]\n${truncated}`);
+  }
 
   if (selectedText) {
     const truncated = truncateText(selectedText, MAX_SELECTION_CHARS);
@@ -90,6 +107,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activityContext, setActivityContext] = useState<string | null>(null);
   const { toggleSidebar } = useSidebar();
   const { activities, isLoading: isActivityLoading, refresh: refreshActivity } =
     useActivityStream();
@@ -163,12 +181,16 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   );
 
   const handleSubmit = useCallback(
-    async (userPrompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean) => {
+    async (userPrompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean, activityCtx: string | null) => {
       if (!claudeAPI || !userPrompt.trim()) return;
 
       setIsSubmitting(true);
+      // Clear activity context after including it in the prompt
+      if (activityCtx) {
+        setActivityContext(null);
+      }
 
-      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext);
+      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext, activityCtx);
 
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
@@ -220,6 +242,17 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   const handleNewSession = useCallback(() => {
     setSessionId(null);
     setMessages([]);
+  }, []);
+
+  const handleIncludeActivity = useCallback(() => {
+    if (activities.length === 0) return;
+    const formatted = formatActivitiesAsContext(activities);
+    setActivityContext(formatted);
+    setActiveTab("assistant");
+  }, [activities]);
+
+  const handleClearActivityContext = useCallback(() => {
+    setActivityContext(null);
   }, []);
 
   const handleApply = useCallback((text: string) => {
@@ -327,8 +360,10 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
             selectedText={editorContext?.selectedText ?? null}
             noteContent={editorContext?.noteContent ?? null}
             includeNoteContext={editorContext?.includeNoteContext ?? true}
+            activityContext={activityContext}
             onIncludeNoteContextChange={editorContext?.setIncludeNoteContext}
             onClearSelection={editorContext?.clearSelection}
+            onClearActivityContext={handleClearActivityContext}
             onSubmit={handleSubmit}
             onNewSession={handleNewSession}
             onApply={handleApply}
@@ -341,6 +376,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
             activities={activities}
             isLoading={isActivityLoading}
             onRefresh={refreshActivity}
+            onIncludeInChat={handleIncludeActivity}
           />
         )}
       </SidebarContent>
@@ -362,9 +398,11 @@ interface AssistantTabProps {
   selectedText: string | null;
   noteContent: string | null;
   includeNoteContext: boolean;
+  activityContext: string | null;
   onIncludeNoteContextChange?: (include: boolean) => void;
   onClearSelection?: () => void;
-  onSubmit: (prompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean) => void;
+  onClearActivityContext?: () => void;
+  onSubmit: (prompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean, activityContext: string | null) => void;
   onNewSession: () => void;
   onApply: (text: string) => void;
   onCopy: (text: string) => void;
@@ -377,8 +415,10 @@ function AssistantTab({
   selectedText,
   noteContent,
   includeNoteContext,
+  activityContext,
   onIncludeNoteContextChange,
   onClearSelection,
+  onClearActivityContext,
   onSubmit,
   onNewSession,
   onApply,
@@ -389,7 +429,7 @@ function AssistantTab({
 
   const handleSubmit = () => {
     if (!inputValue.trim() || isSubmitting) return;
-    onSubmit(inputValue.trim(), selectedText, noteContent, includeNoteContext);
+    onSubmit(inputValue.trim(), selectedText, noteContent, includeNoteContext, activityContext);
     setInputValue("");
   };
 
@@ -402,7 +442,9 @@ function AssistantTab({
 
   const hasSelection = Boolean(selectedText);
   const hasNoteContent = Boolean(noteContent);
+  const hasActivityContext = Boolean(activityContext);
   const selectionLength = selectedText?.length ?? 0;
+  const activityContextLength = activityContext?.length ?? 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -460,11 +502,28 @@ function AssistantTab({
           </div>
         )}
 
+        {hasActivityContext && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-orange-500/10 border border-orange-500/20">
+            <Activity className="size-3.5 text-orange-500 shrink-0" />
+            <span className="text-xs text-orange-500 flex-1 truncate">
+              Activity context ({activityContextLength} chars)
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              onClick={onClearActivityContext}
+            >
+              <X className="size-3" />
+            </Button>
+          </div>
+        )}
+
         <textarea
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={hasSelection ? "Ask about selection..." : "Ask Claude..."}
+          placeholder={hasActivityContext ? "Ask about your recent activity..." : hasSelection ? "Ask about selection..." : "Ask Claude..."}
           className={cn(
             "w-full min-h-[60px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm",
             "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

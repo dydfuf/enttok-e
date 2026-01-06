@@ -1,6 +1,5 @@
-import { RefreshCw } from "lucide-react";
+import { Bot, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ActivityItem, type ActivityItemData } from "./ActivityItem";
 import { cn } from "@/lib/utils";
 
@@ -8,25 +7,31 @@ interface ActivityStreamProps {
   activities?: ActivityItemData[];
   isLoading?: boolean;
   onRefresh?: () => void;
-  showNewBadge?: boolean;
+  onIncludeInChat?: () => void;
 }
 
 export function ActivityStream({
   activities = [],
   isLoading = false,
   onRefresh,
-  showNewBadge = true,
+  onIncludeInChat,
 }: ActivityStreamProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-muted/30 sticky top-0 backdrop-blur-sm z-10">
         <h3 className="font-semibold text-sm">Activity Stream</h3>
-        <div className="flex gap-2 items-center">
-          {showNewBadge && activities.length > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
-              NEW
-            </Badge>
+        <div className="flex gap-1.5 items-center">
+          {activities.length > 0 && onIncludeInChat && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-6 gap-1.5 text-xs px-2 cursor-pointer"
+              onClick={onIncludeInChat}
+            >
+              <Bot className="size-3" />
+              Include
+            </Button>
           )}
           <Button
             variant="ghost"
