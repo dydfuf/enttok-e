@@ -47,7 +47,17 @@ export function useCalendarEvents(options: CalendarEventsOptions): CalendarEvent
 			const data = await fetchEvents(state.port, state.token, requestParams);
 			setEvents(data);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to load events");
+			let errorMessage = "Failed to load events";
+			if (err instanceof Error) {
+				// Check if it's a network/CORS error
+				if (err.message === "Failed to fetch") {
+					errorMessage = `Network error: Unable to reach backend (port ${state.port}). Check if backend is running.`;
+				} else {
+					errorMessage = err.message;
+				}
+			}
+			setError(errorMessage);
+			console.error("Calendar events fetch error:", err);
 		} finally {
 			setIsLoading(false);
 		}

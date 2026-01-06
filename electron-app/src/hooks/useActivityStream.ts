@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, formatDistanceToNow, isValid, parseISO, subHours } from "date-fns";
 import { useGitHub } from "@/contexts/GitHubContext";
 import { useActivityEvents } from "@/hooks/useActivityEvents";
+import { useCalendar } from "@/hooks/useCalendar";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import type { CalendarEvent } from "@/lib/calendar-api";
 import type { ActivityItemData } from "@/components/activity";
@@ -66,6 +67,8 @@ export function useActivityStream(): ActivityStreamState {
 		refreshSummary,
 	} = useGitHub();
 
+	const { primaryCalendarIds } = useCalendar();
+
 	const [rangeEnd, setRangeEnd] = useState(() => new Date());
 	const rangeStart = useMemo(
 		() => subHours(rangeEnd, ACTIVITY_WINDOW_HOURS),
@@ -81,7 +84,9 @@ export function useActivityStream(): ActivityStreamState {
 	} = useCalendarEvents({
 		start: rangeStart,
 		end: rangeEnd,
+		calendarIds: primaryCalendarIds,
 		selectedOnly: true,
+		enabled: primaryCalendarIds.length > 0,
 	});
 	const {
 		events: activityEvents,

@@ -32,7 +32,7 @@ export function DailyCalendarSection({ date }: DailyCalendarSectionProps) {
 	const navigate = useNavigate();
 	const electronAPI = useMemo(() => getElectronAPI(), []);
 	const { vaultPath } = useVault();
-	const { accounts, isLoading: isAccountLoading, triggerSync } = useCalendar();
+	const { accounts, primaryCalendarIds, isLoading: isAccountLoading, triggerSync } = useCalendar();
 	const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 	const [isSyncing, setIsSyncing] = useState(false);
 	const [autoSyncDone, setAutoSyncDone] = useState(false);
@@ -53,8 +53,9 @@ export function DailyCalendarSection({ date }: DailyCalendarSectionProps) {
 	const { events, isLoading, error, reload } = useCalendarEvents({
 		start,
 		end,
+		calendarIds: primaryCalendarIds,
 		selectedOnly: true,
-		enabled: accounts.length > 0,
+		enabled: accounts.length > 0 && primaryCalendarIds.length > 0,
 	});
 
 	const allDayEvents = useMemo(

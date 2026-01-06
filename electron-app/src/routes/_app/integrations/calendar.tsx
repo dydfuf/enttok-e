@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { format, parseISO, startOfDay, addDays } from "date-fns";
 import { CalendarDays, RefreshCw, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
+	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import {
 	Dialog,
 	DialogContent,
@@ -29,17 +32,240 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useCalendar } from "@/hooks/useCalendar";
-import type { CalendarProvider } from "@/lib/calendar-api";
+import type { CalendarEvent, CalendarProvider } from "@/lib/calendar-api";
 
 export const Route = createFileRoute("/_app/integrations/calendar")({
 	component: CalendarIntegrationPage,
 });
+
+type CalendarEventRowProps = {
+	event: CalendarEvent;
+};
+
+function CalendarEventRow({ event }: CalendarEventRowProps) {
+	const timeDisplay = useMemo(() => {
+		if (event.all_day) return "종일";
+		const start = parseISO(event.start_time);
+		const end = parseISO(event.end_time);
+		return `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`;
+	}, [event.all_day, event.start_time, event.end_time]);
+
+	return (
+		<div className="flex items-start justify-between gap-3 p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+			<div className="min-w-0 flex-1">
+				<div className="flex items-center gap-2">
+					<span
+						className="h-2 w-2 rounded-full flex-shrink-0"
+						style={{ backgroundColor: event.calendar_color || "#94a3b8" }}
+					/>
+					<span className="text-sm font-medium truncate">{event.title}</span>
+				</div>
+				<div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+					<span className="font-mono">{timeDisplay}</span>
+					{event.location && (
+						<>
+							<span>·</span>
+							<span className="truncate">{event.location}</span>
+						</>
+					)}
+				</div>
+				{event.calendar_name && (
+					<div className="text-xs text-muted-foreground mt-0.5 truncate">
+						{event.calendar_name}
+					</div>
+				)}
+			</div>
+		</div>
+	);
+}
+
+type TodayEventsCardProps = {
+	events: CalendarEvent[];
+	isLoading: boolean;
+	error: string | null;
+	onRefresh: () => void;
+};
+
+function TodayEventsCard({
+	events,
+	isLoading,
+	error,
+	onRefresh,
+}: TodayEventsCardProps) {
+	const allDayEvents = useMemo(
+		() => events.filter((event) => event.all_day),
+		[events],
+	);
+	const timedEvents = useMemo(
+		() =>
+			events
+				.filter((event) => !event.all_day)
+				.sort((a, b) => a.start_ts - b.start_ts),
+		[events],
+	);
+
+	return (
+		<Card>
+			<CardHeader className="pb-3">
+				<CardTitle className="text-base flex items-center justify-between">
+					오늘의 일정
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={onRefresh}
+						disabled={isLoading}
+					>
+						{isLoading ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							<RefreshCw className="h-4 w-4" />
+						)}
+					</Button>
+				</CardTitle>
+				<CardDescription>
+					{events.length}개의 일정
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-3">
+				{error && (
+					<div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+						<p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+					</div>
+				)}
+
+				{events.length === 0 ? (
+					<p className="text-sm text-muted-foreground">오늘 일정이 없습니다.</p>
+				) : (
+					<div className="space-y-3">
+						{allDayEvents.length > 0 && (
+							<div className="space-y-1.5">
+								<div className="text-xs font-medium text-muted-foreground">
+									종일
+								</div>
+								{allDayEvents.map((event) => (
+									<CalendarEventRow
+										key={`${event.calendar_id}-${event.event_id}`}
+										event={event}
+									/>
+								))}
+							</div>
+						)}
+
+						{timedEvents.length > 0 && (
+							<div className="space-y-1.5">
+								{allDayEvents.length > 0 && (
+									<div className="text-xs font-medium text-muted-foreground">
+										시간 일정
+									</div>
+								)}
+								{timedEvents.map((event) => (
+									<CalendarEventRow
+										key={`${event.calendar_id}-${event.event_id}`}
+										event={event}
+									/>
+								))}
+							</div>
+						)}
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+type UpcomingEventsCardProps = {
+	groupedEvents: Map<string, CalendarEvent[]>;
+	isLoading: boolean;
+	error: string | null;
+	onRefresh: () => void;
+};
+
+function UpcomingEventsCard({
+	groupedEvents,
+	isLoading,
+	error,
+	onRefresh,
+}: UpcomingEventsCardProps) {
+	const totalEvents = useMemo(() => {
+		let count = 0;
+		for (const events of groupedEvents.values()) {
+			count += events.length;
+		}
+		return count;
+	}, [groupedEvents]);
+
+	const sortedDates = useMemo(
+		() => Array.from(groupedEvents.keys()).sort(),
+		[groupedEvents],
+	);
+
+	return (
+		<Card>
+			<CardHeader className="pb-3">
+				<CardTitle className="text-base flex items-center justify-between">
+					다가오는 일정 (7일)
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={onRefresh}
+						disabled={isLoading}
+					>
+						{isLoading ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							<RefreshCw className="h-4 w-4" />
+						)}
+					</Button>
+				</CardTitle>
+				<CardDescription>
+					{totalEvents}개의 일정
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-4">
+				{error && (
+					<div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+						<p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+					</div>
+				)}
+
+				{totalEvents === 0 ? (
+					<p className="text-sm text-muted-foreground">
+						다가오는 일정이 없습니다.
+					</p>
+				) : (
+					<div className="space-y-4">
+						{sortedDates.map((dateKey) => {
+							const dayEvents = groupedEvents.get(dateKey) || [];
+							const dateObj = parseISO(dateKey);
+							const dateLabel = format(dateObj, "EEE, MMM d");
+
+							return (
+								<div key={dateKey} className="space-y-1.5">
+									<div className="text-xs font-medium text-muted-foreground">
+										{dateLabel}
+									</div>
+									{dayEvents.map((event) => (
+										<CalendarEventRow
+											key={`${event.calendar_id}-${event.event_id}`}
+											event={event}
+										/>
+									))}
+								</div>
+							);
+						})}
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
 
 function CalendarIntegrationPage() {
 	const {
 		isReady,
 		providers,
 		accounts,
+		primaryCalendarIds,
 		isLoading,
 		error,
 		pendingOAuth,
@@ -53,6 +279,58 @@ function CalendarIntegrationPage() {
 
 	const [addDialogOpen, setAddDialogOpen] = useState(false);
 	const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
+
+	// Date ranges for events
+	const todayStart = useMemo(() => startOfDay(new Date()), []);
+	const todayEnd = useMemo(() => addDays(todayStart, 1), [todayStart]);
+	const upcomingStart = useMemo(() => addDays(todayStart, 1), [todayStart]);
+	const upcomingEnd = useMemo(() => addDays(upcomingStart, 7), [upcomingStart]);
+
+	// Today's events (primary calendars only - 내 일정)
+	const {
+		events: todayEvents,
+		isLoading: todayLoading,
+		error: todayError,
+		reload: reloadToday,
+	} = useCalendarEvents({
+		start: todayStart,
+		end: todayEnd,
+		calendarIds: primaryCalendarIds,
+		selectedOnly: true,
+		enabled: isReady && accounts.length > 0 && primaryCalendarIds.length > 0,
+	});
+
+	// Upcoming events (next 7 days, primary calendars only - 내 일정)
+	const {
+		events: upcomingEvents,
+		isLoading: upcomingLoading,
+		error: upcomingError,
+		reload: reloadUpcoming,
+	} = useCalendarEvents({
+		start: upcomingStart,
+		end: upcomingEnd,
+		calendarIds: primaryCalendarIds,
+		selectedOnly: true,
+		enabled: isReady && accounts.length > 0 && primaryCalendarIds.length > 0,
+	});
+
+	// Group upcoming events by date
+	const groupedUpcomingEvents = useMemo(() => {
+		const groups = new Map<string, CalendarEvent[]>();
+		for (const event of upcomingEvents) {
+			const dateKey = format(parseISO(event.start_time), "yyyy-MM-dd");
+			const existing = groups.get(dateKey) || [];
+			groups.set(dateKey, [...existing, event]);
+		}
+		// Sort events within each group by start_ts
+		for (const [key, events] of groups) {
+			groups.set(
+				key,
+				events.sort((a, b) => a.start_ts - b.start_ts),
+			);
+		}
+		return groups;
+	}, [upcomingEvents]);
 
 	const handleAddAccount = async (provider: CalendarProvider) => {
 		try {
@@ -235,6 +513,19 @@ function CalendarIntegrationPage() {
 					</div>
 				) : (
 					<div className="space-y-4">
+						<TodayEventsCard
+							events={todayEvents}
+							isLoading={todayLoading}
+							error={todayError}
+							onRefresh={reloadToday}
+						/>
+						<UpcomingEventsCard
+							groupedEvents={groupedUpcomingEvents}
+							isLoading={upcomingLoading}
+							error={upcomingError}
+							onRefresh={reloadUpcoming}
+						/>
+
 						{accounts.map((account) => {
 							const providerInfo = getProviderById(account.provider);
 							const isSyncing = syncingAccountId === account.account_id;

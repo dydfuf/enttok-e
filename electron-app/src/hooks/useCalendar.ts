@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useBackend } from "@/contexts/BackendContext";
 import {
 	fetchProviders,
 	fetchAccounts,
+	fetchCalendars,
 	createAccount,
 	deleteAccount,
 	syncAccount,
@@ -12,6 +13,7 @@ import {
 	type CalendarProviderInfo,
 	type CalendarAccount,
 	type CalendarAccountCreate,
+	type CalendarListItem,
 	type OAuthStartResponse,
 } from "@/lib/calendar-api";
 
@@ -19,11 +21,14 @@ export interface UseCalendarReturn {
 	isReady: boolean;
 	providers: CalendarProviderInfo[];
 	accounts: CalendarAccount[];
+	calendars: CalendarListItem[];
+	primaryCalendarIds: string[];
 	isLoading: boolean;
 	error: string | null;
 	pendingOAuth: OAuthStartResponse | null;
 	loadProviders: () => Promise<void>;
 	loadAccounts: () => Promise<void>;
+	loadCalendars: () => Promise<void>;
 	addAccount: (payload: CalendarAccountCreate) => Promise<CalendarAccount>;
 	removeAccount: (accountId: string) => Promise<void>;
 	triggerSync: (accountId: string) => Promise<{ job_id: string }>;
@@ -37,6 +42,7 @@ export function useCalendar(): UseCalendarReturn {
 	const { state } = useBackend();
 	const [providers, setProviders] = useState<CalendarProviderInfo[]>([]);
 	const [accounts, setAccounts] = useState<CalendarAccount[]>([]);
+	const [calendars, setCalendars] = useState<CalendarListItem[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [pendingOAuth, setPendingOAuth] = useState<OAuthStartResponse | null>(
@@ -45,6 +51,11 @@ export function useCalendar(): UseCalendarReturn {
 
 	const isReady =
 		state?.status === "running" && state.port !== null && state.token !== null;
+
+	const primaryCalendarIds = useMemo(
+		() => calendars.filter((c) => c.is_primary).map((c) => c.calendar_id),
+		[calendars],
+	);
 
 	const loadProviders = useCallback(async () => {
 		if (!isReady || !state?.port || !state?.token) return;
@@ -73,6 +84,19 @@ export function useCalendar(): UseCalendarReturn {
 			setError(err instanceof Error ? err.message : "Failed to load accounts");
 		} finally {
 			setIsLoading(false);
+		}
+	}, [isReady, state?.port, state?.token]);
+
+	const loadCalendars = useCallback(async () => {
+		if (!isReady || !state?.port || !state?.token) return;
+
+		try {
+			const data = await fetchCalendars(state.port, state.token, {
+				selected_only: false,
+			});
+			setCalendars(data);
+		} catch (err) {
+			console.error("Failed to load calendars:", err);
 		}
 	}, [isReady, state?.port, state?.token]);
 
@@ -214,18 +238,22 @@ export function useCalendar(): UseCalendarReturn {
 		if (isReady) {
 			loadProviders();
 			loadAccounts();
+			loadCalendars();
 		}
-	}, [isReady, loadProviders, loadAccounts]);
+	}, [isReady, loadProviders, loadAccounts, loadCalendars]);
 
 	return {
 		isReady,
 		providers,
 		accounts,
+		calendars,
+		primaryCalendarIds,
 		isLoading,
 		error,
 		pendingOAuth,
 		loadProviders,
 		loadAccounts,
+		loadCalendars,
 		addAccount,
 		removeAccount,
 		triggerSync,

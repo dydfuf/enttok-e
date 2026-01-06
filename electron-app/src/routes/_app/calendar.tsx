@@ -52,7 +52,7 @@ function CalendarPage() {
 	const navigate = useNavigate();
 	const { state } = useBackend();
 	const { vaultPath } = useVault();
-	const { accounts, isLoading: isCalendarLoading, triggerSync } = useCalendar();
+	const { accounts, primaryCalendarIds, isLoading: isCalendarLoading, triggerSync } = useCalendar();
 
 	const [view, setView] = useState<CalendarView>("week");
 	const [anchorDate, setAnchorDate] = useState<Date>(new Date());
@@ -82,8 +82,9 @@ function CalendarPage() {
 	const { events, isLoading, error, reload } = useCalendarEvents({
 		start: dateRange.start,
 		end: dateRange.end,
+		calendarIds: primaryCalendarIds,
 		selectedOnly: true,
-		enabled: isBackendReady,
+		enabled: isBackendReady && primaryCalendarIds.length > 0,
 	});
 
 	const days = useMemo(() => {

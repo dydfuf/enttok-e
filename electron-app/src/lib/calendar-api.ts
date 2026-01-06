@@ -48,8 +48,8 @@ export type CalendarListItem = {
 	foreground_color?: string;
 	time_zone?: string;
 	selected: boolean;
-	created_at: string;
-	updated_at: string;
+	created_at?: string;
+	updated_at?: string;
 };
 
 export type CalendarsResponse = {
@@ -75,8 +75,8 @@ export type CalendarEvent = {
 	attendees?: Array<{ email: string; displayName?: string; responseStatus?: string }>;
 	html_link?: string;
 	time_zone?: string;
-	created_at: string;
-	updated_at: string;
+	created_at?: string;
+	updated_at?: string;
 	calendar_color?: string;
 	calendar_name?: string;
 };
@@ -212,7 +212,16 @@ export async function fetchEvents(
 		},
 	);
 	if (!res.ok) {
-		throw new Error(`Failed to fetch events: ${res.status}`);
+		let errorDetail = `HTTP ${res.status}`;
+		try {
+			const errorData = await res.json();
+			if (errorData.detail) {
+				errorDetail = errorData.detail;
+			}
+		} catch {
+			// ignore JSON parse errors
+		}
+		throw new Error(`Failed to fetch events: ${errorDetail}`);
 	}
 	const data: EventsResponse = await res.json();
 	return data.events;

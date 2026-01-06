@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import traceback
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # Load .env file from backend directory
 _backend_dir = Path(__file__).resolve().parent.parent
@@ -38,7 +40,8 @@ def create_app() -> FastAPI:
         ],
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["*"],
+        allow_headers=["*", "X-Backend-Token", "Content-Type"],
+        expose_headers=["*"],
     )
 
     app.include_router(health.router)
@@ -50,6 +53,17 @@ def create_app() -> FastAPI:
     app.include_router(jira.router)
     app.include_router(confluence.router)
     app.include_router(activity.router)
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Catch all unhandled exceptions and return JSON with proper error info."""
+        error_detail = str(exc)
+        tb = traceback.format_exc()
+        print(f"Unhandled exception: {error_detail}\n{tb}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": error_detail, "type": type(exc).__name__},
+        )
 
     @app.on_event("startup")
     async def on_startup() -> None:

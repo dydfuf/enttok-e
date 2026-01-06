@@ -90,8 +90,8 @@ class CalendarEvent(BaseModel):
     attendees: Optional[List[Dict[str, Any]]] = None
     html_link: Optional[str] = None
     time_zone: Optional[str] = None
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     calendar_color: Optional[str] = None
     calendar_name: Optional[str] = None
 
@@ -112,8 +112,8 @@ class CalendarListItem(BaseModel):
     foreground_color: Optional[str] = None
     time_zone: Optional[str] = None
     selected: bool = True
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class CalendarListResponse(BaseModel):
