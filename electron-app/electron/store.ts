@@ -7,6 +7,14 @@ export interface VaultInfo {
   lastOpened: string;
 }
 
+export interface WorkTimeNotificationSettings {
+  enabled: boolean;
+  workStartTime: string | null;
+  workEndTime: string | null;
+  workStartMessage: string;
+  workEndMessage: string;
+}
+
 interface StoreSchema {
   currentVaultPath: string | null;
   recentVaults: VaultInfo[];
@@ -16,6 +24,7 @@ interface StoreSchema {
   dailyNoteTemplate: string;
   assetsFolder: string;
   gitHubRepoPaths: string[];
+  workTimeNotifications: WorkTimeNotificationSettings;
 }
 
 const DEFAULT_DAILY_NOTE_TEMPLATE = `---
@@ -47,6 +56,13 @@ const store = new Store<StoreSchema>({
     dailyNoteTemplate: DEFAULT_DAILY_NOTE_TEMPLATE,
     assetsFolder: "assets",
     gitHubRepoPaths: [],
+    workTimeNotifications: {
+      enabled: false,
+      workStartTime: null,
+      workEndTime: null,
+      workStartMessage: "출근 시간입니다! 오늘의 업무를 정리해보세요.",
+      workEndMessage: "퇴근 시간입니다! 오늘 하루를 마무리해보세요.",
+    },
   },
 });
 
@@ -143,4 +159,14 @@ export function setGitHubRepoPaths(paths: string[]): void {
 
 export function hasVault(): boolean {
   return store.get("currentVaultPath") !== null;
+}
+
+export function getWorkTimeNotifications(): WorkTimeNotificationSettings {
+  return store.get("workTimeNotifications");
+}
+
+export function setWorkTimeNotifications(
+  settings: WorkTimeNotificationSettings
+): void {
+  store.set("workTimeNotifications", settings);
 }

@@ -31,8 +31,13 @@ import {
 	validateAssetsFolder,
 	validateDailyFolder,
 } from "@/lib/vault-paths";
-import type { RuntimeBinaryStatus, RuntimeStatus } from "@/shared/electron-api";
+import type {
+	RuntimeBinaryStatus,
+	RuntimeStatus,
+	WorkTimeNotificationSettings,
+} from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
+import { Switch } from "@/components/ui/switch";
 
 type SettingsSearch = {
 	tab?: string;
@@ -111,6 +116,16 @@ function SettingsPage() {
 	const [dailyTemplateInput, setDailyTemplateInput] = useState(
 		DEFAULT_DAILY_NOTE_TEMPLATE,
 	);
+	const [notificationSettings, setNotificationSettings] =
+		useState<WorkTimeNotificationSettings>({
+			enabled: false,
+			workStartTime: null,
+			workEndTime: null,
+			workStartMessage: "출근 시간입니다! 오늘의 업무를 정리해보세요.",
+			workEndMessage: "퇴근 시간입니다! 오늘 하루를 마무리해보세요.",
+		});
+	const [savedNotificationSettings, setSavedNotificationSettings] =
+		useState<WorkTimeNotificationSettings | null>(null);
 
 	const lastLogs = useMemo(() => logs.slice(-10), [logs]);
 	const dailyFolderValidation = useMemo(
@@ -136,6 +151,10 @@ function SettingsPage() {
 					: "Unhealthy"
 				: "Checking"
 			: "N/A";
+	const notificationsDirty =
+		savedNotificationSettings !== null &&
+		JSON.stringify(notificationSettings) !==
+			JSON.stringify(savedNotificationSettings);
 
 	useEffect(() => {
 		const api = getElectronAPI();
@@ -233,6 +252,27 @@ function SettingsPage() {
 		};
 	}, []);
 
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		let mounted = true;
+		api
+			.getWorkTimeNotifications()
+			.then((value) => {
+				if (!mounted) {
+					return;
+				}
+				setNotificationSettings(value);
+				setSavedNotificationSettings(value);
+			})
+			.catch(() => undefined);
+		return () => {
+			mounted = false;
+		};
+	}, []);
+
 	const handleSaveTemplate = async () => {
 		const api = getElectronAPI();
 		if (!api) {
@@ -291,6 +331,37 @@ function SettingsPage() {
 		toast.success("Assets folder updated");
 	};
 
+	const handleSaveNotifications = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		try {
+			const result = await api.setWorkTimeNotifications(notificationSettings);
+			if (!result.success) {
+				toast.error("알림 설정 저장에 실패했습니다");
+				return;
+			}
+			setSavedNotificationSettings(notificationSettings);
+			toast.success("알림 설정이 저장되었습니다!");
+		} catch {
+			toast.error("알림 설정 저장에 실패했습니다");
+		}
+	};
+
+	const handleTestNotification = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		try {
+			await api.testNotification();
+			toast.success("테스트 알림을 발송했습니다!");
+		} catch {
+			toast.error("테스트 알림 발송에 실패했습니다");
+		}
+	};
+
 	return (
 		<div className="min-h-full p-6">
 			<div className="max-w-3xl mx-auto">
@@ -303,6 +374,7 @@ function SettingsPage() {
 				<Tabs defaultValue={tab ?? "general"} className="space-y-6">
 					<TabsList>
 						<TabsTrigger value="general">General</TabsTrigger>
+						<TabsTrigger value="notifications">Notifications</TabsTrigger>
 						<TabsTrigger value="appearance">Appearance</TabsTrigger>
 						<TabsTrigger value="templates">Templates</TabsTrigger>
 						<TabsTrigger value="system">System</TabsTrigger>
@@ -440,6 +512,111 @@ function SettingsPage() {
 								</CardContent>
 							</Card>
 						</div>
+					</TabsContent>
+
+					<TabsContent value="notifications">
+						<Card>
+							<CardHeader>
+								<CardTitle>출퇴근 알림</CardTitle>
+								<CardDescription>
+									출근/퇴근 시간에 알림을 받아 업무를 정리하세요
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-6">
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label>알림 활성화</Label>
+										<p className="text-sm text-muted-foreground">
+											출퇴근 시간 알림을 켜거나 끕니다
+										</p>
+									</div>
+									<Switch
+										checked={notificationSettings.enabled}
+										onCheckedChange={(checked) => {
+											setNotificationSettings((prev) => ({
+												...prev,
+												enabled: checked,
+											}));
+										}}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>출근 시간</Label>
+									<Input
+										type="time"
+										value={notificationSettings.workStartTime ?? ""}
+										onChange={(e) => {
+											setNotificationSettings((prev) => ({
+												...prev,
+												workStartTime: e.target.value || null,
+											}));
+										}}
+										disabled={!notificationSettings.enabled}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>출근 알림 메시지</Label>
+									<Textarea
+										value={notificationSettings.workStartMessage}
+										onChange={(e) => {
+											setNotificationSettings((prev) => ({
+												...prev,
+												workStartMessage: e.target.value,
+											}));
+										}}
+										disabled={!notificationSettings.enabled}
+										className="min-h-[80px]"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>퇴근 시간</Label>
+									<Input
+										type="time"
+										value={notificationSettings.workEndTime ?? ""}
+										onChange={(e) => {
+											setNotificationSettings((prev) => ({
+												...prev,
+												workEndTime: e.target.value || null,
+											}));
+										}}
+										disabled={!notificationSettings.enabled}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>퇴근 알림 메시지</Label>
+									<Textarea
+										value={notificationSettings.workEndMessage}
+										onChange={(e) => {
+											setNotificationSettings((prev) => ({
+												...prev,
+												workEndMessage: e.target.value,
+											}));
+										}}
+										disabled={!notificationSettings.enabled}
+										className="min-h-[80px]"
+									/>
+								</div>
+
+								<div className="flex gap-2">
+									<Button
+										onClick={handleSaveNotifications}
+										disabled={!notificationsDirty}
+									>
+										설정 저장
+									</Button>
+									<Button
+										variant="outline"
+										onClick={handleTestNotification}
+									>
+										테스트 알림
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
 					</TabsContent>
 
 					<TabsContent value="appearance">

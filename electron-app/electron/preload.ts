@@ -6,6 +6,7 @@ import type {
   GitHubDailySummary,
   GitHubStatus,
   RuntimeStatus,
+  WorkTimeNotificationSettings,
 } from "../src/shared/electron-api";
 
 // Electron API를 렌더러 프로세스에 노출
@@ -116,6 +117,15 @@ const api: ElectronAPI = {
   setGitHubRepoPaths: (paths: string[]) =>
     ipcRenderer.invoke("github:set-repo-paths", paths),
   selectGitHubRepoFolder: () => ipcRenderer.invoke("github:select-repo"),
+
+  // Work Time Notifications API
+  getWorkTimeNotifications: () =>
+    ipcRenderer.invoke(
+      "notifications:get-settings"
+    ) as Promise<WorkTimeNotificationSettings>,
+  setWorkTimeNotifications: (settings: WorkTimeNotificationSettings) =>
+    ipcRenderer.invoke("notifications:set-settings", settings),
+  testNotification: () => ipcRenderer.invoke("notifications:test"),
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);

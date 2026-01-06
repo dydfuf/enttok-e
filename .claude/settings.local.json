@@ -4,7 +4,9 @@
       "mcp__ide__getDiagnostics",
       "Bash(pnpm lint:*)",
       "Bash(pnpm lint:check:*)",
-      "Bash(pnpm tsc:*)"
+      "Bash(pnpm tsc:*)",
+      "Skill(clarify)",
+      "Bash(pnpm tsc:check:*)"
     ]
   }
 }

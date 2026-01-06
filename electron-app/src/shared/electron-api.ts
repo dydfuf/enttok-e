@@ -183,6 +183,14 @@ export type GitHubDailySummary = {
   };
 };
 
+export type WorkTimeNotificationSettings = {
+  enabled: boolean;
+  workStartTime: string | null; // "HH:mm"
+  workEndTime: string | null; // "HH:mm"
+  workStartMessage: string;
+  workEndMessage: string;
+};
+
 export type ElectronAPI = {
   send: (channel: string, data: unknown) => void;
   receive: (channel: string, func: (...args: unknown[]) => void) => void;
@@ -231,4 +239,10 @@ export type ElectronAPI = {
   getGitHubRepoPaths: () => Promise<string[]>;
   setGitHubRepoPaths: (paths: string[]) => Promise<{ success: boolean }>;
   selectGitHubRepoFolder: () => Promise<SelectFolderResult>;
+  // Work Time Notifications
+  getWorkTimeNotifications: () => Promise<WorkTimeNotificationSettings>;
+  setWorkTimeNotifications: (
+    settings: WorkTimeNotificationSettings
+  ) => Promise<{ success: boolean }>;
+  testNotification: () => Promise<{ success: boolean }>;
 };

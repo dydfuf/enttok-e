@@ -3,10 +3,16 @@ import { getPreloadPath, getRendererIndexPath } from "../paths.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
-export function createMainWindow() {
+let mainWindow: BrowserWindow | null = null;
+
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow;
+}
+
+export function createMainWindow(): BrowserWindow {
   const isMac = process.platform === "darwin";
 
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     titleBarStyle: isMac ? "hiddenInset" : undefined,
@@ -33,6 +39,10 @@ export function createMainWindow() {
     // 프로덕션: 빌드된 파일 로드
     mainWindow.loadFile(getRendererIndexPath());
   }
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 
   return mainWindow;
 }

@@ -6,6 +6,10 @@ import {
   registerVaultProtocol,
   registerVaultProtocolScheme,
 } from "./main/protocols.js";
+import {
+  initializeNotificationScheduler,
+  stopNotificationScheduler,
+} from "./main/notifications.js";
 
 registerVaultProtocolScheme();
 
@@ -13,6 +17,7 @@ app.whenReady().then(() => {
   registerVaultProtocol();
   createMainWindow();
   registerIpcHandlers();
+  initializeNotificationScheduler();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -28,5 +33,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", async () => {
+  stopNotificationScheduler();
   await stopBackend();
 });
