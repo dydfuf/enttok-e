@@ -1,9 +1,10 @@
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Bot, FileText, History, Loader2, Plus, X } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -80,16 +81,26 @@ function extractOutput(job: ClaudeJobRecord): string | null {
 
 type TabType = "assistant" | "activity";
 
-export default function AssistantSidebar() {
+type AssistantSidebarProps = {
+  onResize: (width: number) => void;
+};
+
+export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>("assistant");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toggleSidebar } = useSidebar();
   const { activities, isLoading: isActivityLoading, refresh: refreshActivity } =
     useActivityStream();
 
   const editorContext = useEditorOptional();
   const claudeAPI = useMemo<ClaudeAPI | null>(() => getElectronAPI(), []);
+  const resizeStateRef = useRef({
+    startX: 0,
+    isResizing: false,
+    didDrag: false,
+  });
 
   const updateMessage = useCallback(
     (id: string, patch: Partial<ChatMessage>) => {
@@ -226,6 +237,66 @@ export default function AssistantSidebar() {
     }
   }, []);
 
+  const handleRailPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      resizeStateRef.current = {
+        startX: event.clientX,
+        isResizing: true,
+        didDrag: false,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
+    },
+    []
+  );
+
+  const handleRailPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState.isResizing) return;
+      if (Math.abs(event.clientX - resizeState.startX) > 2) {
+        resizeState.didDrag = true;
+      }
+      onResize(window.innerWidth - event.clientX);
+    },
+    [onResize]
+  );
+
+  const handleRailPointerUp = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState.isResizing) return;
+      resizeState.isResizing = false;
+      resizeState.startX = 0;
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    },
+    []
+  );
+
+  const handleRailClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (resizeStateRef.current.didDrag) {
+        resizeStateRef.current.didDrag = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      toggleSidebar();
+    },
+    [toggleSidebar]
+  );
+
+  useEffect(() => {
+    return () => {
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+  }, []);
+
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="right">
       <SidebarContent className="group-data-[collapsible=icon]:hidden">
@@ -273,7 +344,13 @@ export default function AssistantSidebar() {
           />
         )}
       </SidebarContent>
-      <SidebarRail />
+      <SidebarRail
+        onPointerDown={handleRailPointerDown}
+        onPointerMove={handleRailPointerMove}
+        onPointerUp={handleRailPointerUp}
+        onPointerCancel={handleRailPointerUp}
+        onClick={handleRailClick}
+      />
     </Sidebar>
   );
 }
