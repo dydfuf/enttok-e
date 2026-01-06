@@ -57,7 +57,7 @@ export function SidebarCalendar({
         onSelect={handleSelect}
         modifiers={modifiers}
         modifiersClassNames={noteModifierClassNames}
-        className="w-full p-0"
+        className="w-full bg-sidebar p-0"
       />
     </div>
   );
