@@ -6,7 +6,10 @@
       "Bash(pnpm lint:check:*)",
       "Bash(pnpm tsc:*)",
       "Skill(clarify)",
-      "Bash(pnpm tsc:check:*)"
+      "Bash(pnpm tsc:check:*)",
+      "Bash(npx tsc:*)",
+      "WebSearch",
+      "Bash(tree:*)"
     ]
   }
 }

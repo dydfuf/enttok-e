@@ -2,7 +2,7 @@ import type { Extension } from "@codemirror/state";
 import { ViewPlugin, Decoration, EditorView, WidgetType } from "@codemirror/view";
 import type { ViewUpdate, DecorationSet } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import type { SyntaxNodeRef } from "@lezer/common";
+import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { resolveAssetUrl } from "@/lib/vault-paths";
 
 // Checkbox Widget for task lists
@@ -418,9 +418,9 @@ function processTaskList(
 }
 
 function isInsideLinkContainer(
-  node: SyntaxNodeRef | null
+  node: SyntaxNode | null
 ): boolean {
-  let current = node;
+  let current: SyntaxNode | null = node;
   while (current) {
     if (LINK_CONTAINER_NODES.has(current.name)) {
       return true;

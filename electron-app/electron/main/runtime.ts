@@ -119,24 +119,40 @@ function findExistingPath(paths: string[]) {
   return null;
 }
 
-function execFileWithOutput(command: string, args: string[], timeoutMs = 2000) {
+function execFileWithOutput(
+  command: string,
+  args: string[],
+  options: { timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}
+) {
+  const { timeoutMs = 2000, env } = options;
   return new Promise<{
     stdout: string;
     stderr: string;
     error: Error | null;
   }>((resolve) => {
-    execFile(command, args, { timeout: timeoutMs }, (error, stdout, stderr) => {
-      resolve({
-        stdout: stdout?.toString() ?? "",
-        stderr: stderr?.toString() ?? "",
-        error: error ?? null,
-      });
-    });
+    execFile(
+      command,
+      args,
+      { timeout: timeoutMs, env: env ?? process.env },
+      (error, stdout, stderr) => {
+        resolve({
+          stdout: stdout?.toString() ?? "",
+          stderr: stderr?.toString() ?? "",
+          error: error ?? null,
+        });
+      }
+    );
   });
 }
 
-async function readVersion(command: string, args: string[]) {
-  const { stdout, stderr, error } = await execFileWithOutput(command, args);
+async function readVersion(
+  command: string,
+  args: string[],
+  env?: NodeJS.ProcessEnv
+) {
+  const { stdout, stderr, error } = await execFileWithOutput(command, args, {
+    env,
+  });
   const output = `${stdout}${stderr}`.trim();
   return {
     version: output || null,
@@ -144,11 +160,14 @@ async function readVersion(command: string, args: string[]) {
   };
 }
 
-async function getNpmGlobalBin(npmPath: string | null) {
+async function getNpmGlobalBin(
+  npmPath: string | null,
+  env?: NodeJS.ProcessEnv
+) {
   if (!npmPath) {
     return null;
   }
-  const { stdout } = await execFileWithOutput(npmPath, ["root", "-g"]);
+  const { stdout } = await execFileWithOutput(npmPath, ["root", "-g"], { env });
   const root = stdout.trim();
   if (!root) {
     return null;
@@ -162,12 +181,13 @@ async function getNpmGlobalBin(npmPath: string | null) {
 
 async function buildBinaryStatus(
   pathValue: string | null,
-  versionArgs: string[]
+  versionArgs: string[],
+  env?: NodeJS.ProcessEnv
 ): Promise<RuntimeBinaryStatus> {
   if (!pathValue) {
     return { found: false, path: null, version: null, error: "not-found" };
   }
-  const { version, error } = await readVersion(pathValue, versionArgs);
+  const { version, error } = await readVersion(pathValue, versionArgs, env);
   return {
     found: true,
     path: pathValue,
@@ -193,9 +213,28 @@ export async function refreshRuntimeStatus() {
     const nodePath = findExecutable("node", searchDirs);
     const npxPath = findExecutable("npx", searchDirs);
     const npmPath = findExecutable("npm", searchDirs);
-    const npmGlobalBin = await getNpmGlobalBin(npmPath);
+
+    // Build enriched PATH with discovered binary directories for subprocess execution
+    // This fixes the issue where GUI apps on macOS don't inherit terminal PATH
+    const enrichedPaths: string[] = [];
+    if (nodePath) {
+      enrichedPaths.push(path.dirname(nodePath));
+    }
+    if (npxPath) {
+      enrichedPaths.push(path.dirname(npxPath));
+    }
+    if (npmPath) {
+      enrichedPaths.push(path.dirname(npmPath));
+    }
+    const enrichedEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      PATH: mergePathList(enrichedPaths, process.env.PATH),
+    };
+
+    const npmGlobalBin = await getNpmGlobalBin(npmPath, enrichedEnv);
 
     const claudeCandidates = [
+      path.join(os.homedir(), ".local", "bin", "claude"),
       path.join(os.homedir(), ".npm-global", "bin", "claude"),
       "/usr/local/bin/claude",
       "/opt/homebrew/bin/claude",
@@ -208,9 +247,21 @@ export async function refreshRuntimeStatus() {
       findExecutable("claude", nvmDirs) ||
       findExecutable("claude", searchDirs);
 
-    const nodeStatus = await buildBinaryStatus(nodePath, ["--version"]);
-    const npxStatus = await buildBinaryStatus(npxPath, ["--version"]);
-    const claudeStatus = await buildBinaryStatus(claudePath, ["--version"]);
+    const nodeStatus = await buildBinaryStatus(
+      nodePath,
+      ["--version"],
+      enrichedEnv
+    );
+    const npxStatus = await buildBinaryStatus(
+      npxPath,
+      ["--version"],
+      enrichedEnv
+    );
+    const claudeStatus = await buildBinaryStatus(
+      claudePath,
+      ["--version"],
+      enrichedEnv
+    );
 
     runtimeStatus = {
       node: nodeStatus,

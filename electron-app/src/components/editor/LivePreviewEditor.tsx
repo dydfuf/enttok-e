@@ -16,7 +16,7 @@ import {
   indentOnInput,
   syntaxTree,
 } from "@codemirror/language";
-import type { SyntaxNodeRef } from "@lezer/common";
+import type { SyntaxNode } from "@lezer/common";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { toast } from "sonner";
@@ -362,7 +362,7 @@ function findWikiLinkTarget(
 
 function findLinkTargetAtPos(view: EditorView, pos: number): LinkTarget | null {
   const tree = syntaxTree(view.state);
-  let node: SyntaxNodeRef | null = tree.resolveInner(pos, -1);
+  let node: SyntaxNode | null = tree.resolveInner(pos, -1);
 
   while (node) {
     if (node.name === "Link") {
