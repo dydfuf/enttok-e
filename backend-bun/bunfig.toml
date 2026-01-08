@@ -1,0 +1,14 @@
+# Bun configuration
+# https://bun.sh/docs/runtime/bunfig
+
+[install]
+# Install peer dependencies automatically
+peer = true
+
+[run]
+# Don't show "bun run" prefix in output
+silent = false
+
+[test]
+# Test configuration
+coverage = false

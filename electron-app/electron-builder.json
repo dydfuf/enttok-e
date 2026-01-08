@@ -7,9 +7,8 @@
   },
   "files": ["dist-react/**/*", "dist-electron/**/*"],
   "extraResources": [
-    { "from": "../backend", "to": "backend" }
+    { "from": "../backend-bun/dist/backend-bun", "to": "backend-bun" }
   ],
-  "asarUnpack": ["**/backend/**"],
   "mac": {
     "target": ["dmg", "zip"],
     "category": "public.app-category.productivity"

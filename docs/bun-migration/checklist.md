@@ -232,22 +232,23 @@
 ### 3.3 Jira
 
 #### Client
-- [ ] jira.js 설치 (`bun add jira.js`)
-- [ ] `src/services/jira.ts` 생성
-- [ ] createJiraClient()
-- [ ] searchIssues()
-- [ ] 활동 이벤트 추출
+- [x] `src/services/atlassian/client.ts` 생성 (fetch 기반 구현, jira.js 불필요)
+- [x] `src/services/atlassian/jira.ts` 생성
+- [x] atlassianFetch() - HTTP 클라이언트
+- [x] searchIssues() - JQL 검색
+- [x] 활동 이벤트 추출 (created, status.changed, commented, updated)
 
 #### Repository
-- [ ] `src/db/atlassian.ts` 생성 (또는 확장)
-- [ ] Jira account CRUD
+- [x] `src/db/atlassian.ts` 생성 (또는 확장)
+- [x] Jira account CRUD
+- [x] Sync state 관리
 
 #### Routes
-- [ ] `src/routes/jira.ts` 생성
-- [ ] GET /jira/accounts
-- [ ] POST /jira/accounts
-- [ ] DELETE /jira/accounts/:id
-- [ ] POST /jira/accounts/:id/sync
+- [x] `src/routes/jira.ts` 생성
+- [x] GET /jira/accounts
+- [x] POST /jira/accounts
+- [x] DELETE /jira/accounts/:id
+- [x] POST /jira/accounts/:id/sync
 
 #### 테스트
 - [ ] Jira 연결 테스트
@@ -257,17 +258,17 @@
 ### 3.4 Confluence
 
 #### Client
-- [ ] confluence.js 설치 (`bun add confluence.js`)
-- [ ] `src/services/confluence.ts` 생성
-- [ ] createConfluenceClient()
-- [ ] 페이지 활동 조회
+- [x] `src/services/atlassian/confluence.ts` 생성 (fetch 기반 구현, confluence.js 불필요)
+- [x] atlassianFetch() - HTTP 클라이언트 (client.ts 공유)
+- [x] searchContent() - CQL 검색
+- [x] 페이지/블로그/코멘트 활동 조회
 
 #### Routes
-- [ ] `src/routes/confluence.ts` 생성
-- [ ] GET /confluence/accounts
-- [ ] POST /confluence/accounts
-- [ ] DELETE /confluence/accounts/:id
-- [ ] POST /confluence/accounts/:id/sync
+- [x] `src/routes/confluence.ts` 생성
+- [x] GET /confluence/accounts
+- [x] POST /confluence/accounts
+- [x] DELETE /confluence/accounts/:id
+- [x] POST /confluence/accounts/:id/sync
 
 #### 테스트
 - [ ] Confluence 연결 테스트
@@ -276,21 +277,22 @@
 ### 3.5 Activity Stream
 
 #### Repository
-- [ ] Activity events 쿼리 함수
-- [ ] 시간 범위 필터링
-- [ ] 소스별 필터링
+- [x] Activity events 쿼리 함수
+- [x] 시간 범위 필터링
+- [x] 소스별 필터링
+- [x] upsertActivityEvents() 배치 저장
 
 #### Routes
-- [ ] `src/routes/activity.ts` 생성
-- [ ] GET /activity/events
+- [x] `src/routes/activity.ts` 생성
+- [x] GET /activity/events
 
 ### 3.6 Scheduler
 
 #### Service
-- [ ] `src/services/scheduler.ts` 생성
-- [ ] 백그라운드 스케줄러
-- [ ] 자동 동기화 작업 큐잉
-- [ ] 중복 작업 방지
+- [x] `src/services/scheduler.ts` 생성
+- [x] 백그라운드 스케줄러
+- [x] 자동 동기화 작업 큐잉
+- [x] 중복 작업 방지
 
 ---
 
@@ -411,33 +413,33 @@
 
 | Endpoint | Python | Bun | Tested |
 |----------|--------|-----|--------|
-| GET /health | ✅ | [ ] | [ ] |
-| GET /status | ✅ | [ ] | [ ] |
-| POST /jobs | ✅ | [ ] | [ ] |
-| GET /jobs | ✅ | [ ] | [ ] |
-| GET /jobs/:id | ✅ | [ ] | [ ] |
-| POST /jobs/:id/cancel | ✅ | [ ] | [ ] |
-| POST /claude/spawn | ✅ | [ ] | [ ] |
-| POST /claude/session | ✅ | [ ] | [ ] |
-| GET /calendar/providers | ✅ | [ ] | [ ] |
-| POST /calendar/accounts | ✅ | [ ] | [ ] |
-| GET /calendar/accounts | ✅ | [ ] | [ ] |
-| GET /calendar/accounts/:id | ✅ | [ ] | [ ] |
-| DELETE /calendar/accounts/:id | ✅ | [ ] | [ ] |
-| GET /calendar/calendars | ✅ | [ ] | [ ] |
-| PATCH /calendar/calendars/:aid/:cid | ✅ | [ ] | [ ] |
-| GET /calendar/events | ✅ | [ ] | [ ] |
-| POST /calendar/accounts/:id/sync | ✅ | [ ] | [ ] |
-| POST /calendar/oauth/google/start | ✅ | [ ] | [ ] |
-| GET /calendar/oauth/google/callback | ✅ | [ ] | [ ] |
-| POST /calendar/oauth/google/complete | ✅ | [ ] | [ ] |
-| GET /jira/accounts | ✅ | [ ] | [ ] |
-| POST /jira/accounts | ✅ | [ ] | [ ] |
-| DELETE /jira/accounts/:id | ✅ | [ ] | [ ] |
-| POST /jira/accounts/:id/sync | ✅ | [ ] | [ ] |
-| GET /confluence/accounts | ✅ | [ ] | [ ] |
-| POST /confluence/accounts | ✅ | [ ] | [ ] |
-| DELETE /confluence/accounts/:id | ✅ | [ ] | [ ] |
-| POST /confluence/accounts/:id/sync | ✅ | [ ] | [ ] |
-| GET /activity/events | ✅ | [ ] | [ ] |
-| WS /events | ✅ | [ ] | [ ] |
+| GET /health | ✅ | ✅ | ✅ |
+| GET /status | ✅ | ✅ | ✅ |
+| POST /jobs | ✅ | ✅ | ✅ |
+| GET /jobs | ✅ | ✅ | ✅ |
+| GET /jobs/:id | ✅ | ✅ | [ ] |
+| POST /jobs/:id/cancel | ✅ | ✅ | [ ] |
+| POST /claude/spawn | ✅ | ✅ | [ ] |
+| POST /claude/session | ✅ | ✅ | [ ] |
+| GET /calendar/providers | ✅ | ✅ | ✅ |
+| POST /calendar/accounts | ✅ | ✅ | [ ] |
+| GET /calendar/accounts | ✅ | ✅ | [ ] |
+| GET /calendar/accounts/:id | ✅ | ✅ | [ ] |
+| DELETE /calendar/accounts/:id | ✅ | ✅ | [ ] |
+| GET /calendar/calendars | ✅ | ✅ | [ ] |
+| PATCH /calendar/calendars/:aid/:cid | ✅ | ✅ | [ ] |
+| GET /calendar/events | ✅ | ✅ | [ ] |
+| POST /calendar/accounts/:id/sync | ✅ | ✅ | [ ] |
+| POST /calendar/oauth/google/start | ✅ | ✅ | [ ] |
+| GET /calendar/oauth/google/callback | ✅ | ✅ | [ ] |
+| POST /calendar/oauth/google/complete | ✅ | ✅ | [ ] |
+| GET /jira/accounts | ✅ | ✅ | ✅ |
+| POST /jira/accounts | ✅ | ✅ | [ ] |
+| DELETE /jira/accounts/:id | ✅ | ✅ | [ ] |
+| POST /jira/accounts/:id/sync | ✅ | ✅ | [ ] |
+| GET /confluence/accounts | ✅ | ✅ | ✅ |
+| POST /confluence/accounts | ✅ | ✅ | [ ] |
+| DELETE /confluence/accounts/:id | ✅ | ✅ | [ ] |
+| POST /confluence/accounts/:id/sync | ✅ | ✅ | [ ] |
+| GET /activity/events | ✅ | ✅ | [ ] |
+| WS /events | ✅ | ✅ | [ ] |

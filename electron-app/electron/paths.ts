@@ -32,3 +32,24 @@ export function getBackendPythonPath(baseDir: string) {
   }
   return path.join(baseDir, ".venv", "bin", "python");
 }
+
+export function getBackendBunDir() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "backend-bun");
+  }
+  const repoRoot = path.resolve(__dirname, "../../..");
+  const bunBackend = path.join(repoRoot, "backend-bun");
+  if (fs.existsSync(bunBackend)) {
+    return bunBackend;
+  }
+  return path.resolve(app.getAppPath(), "..", "backend-bun");
+}
+
+export function getBackendBunBinaryPath() {
+  if (app.isPackaged) {
+    const binaryName =
+      process.platform === "win32" ? "backend-bun.exe" : "backend-bun";
+    return path.join(process.resourcesPath, "backend-bun", binaryName);
+  }
+  return null;
+}

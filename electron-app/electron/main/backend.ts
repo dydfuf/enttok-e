@@ -6,7 +6,26 @@ import http from "http";
 import net from "net";
 import path from "path";
 import { applyRuntimeEnv, refreshRuntimeStatus } from "./runtime.js";
-import { getBackendBaseDir, getBackendPythonPath } from "../paths.js";
+import {
+  getBackendBaseDir,
+  getBackendPythonPath,
+  getBackendBunDir,
+  getBackendBunBinaryPath,
+} from "../paths.js";
+
+export type BackendType = "python" | "bun";
+
+export function getBackendType(): BackendType {
+  const envType = process.env.BACKEND_TYPE?.toLowerCase();
+  if (envType === "bun") {
+    return "bun";
+  }
+  if (envType === "python") {
+    return "python";
+  }
+  // Default: bun for production, python for development
+  return app.isPackaged ? "bun" : "python";
+}
 
 type BackendStatus = "stopped" | "starting" | "running" | "stopping" | "error";
 
@@ -70,7 +89,7 @@ function ensureBackendDirs() {
   return { baseDir, dataDir, logDir };
 }
 
-function getBackendCommand() {
+function getPythonBackendCommand() {
   const baseDir = getBackendBaseDir();
   if (!app.isPackaged) {
     return {
@@ -84,6 +103,38 @@ function getBackendCommand() {
     args: ["-m", "app.main"],
     cwd: baseDir,
   };
+}
+
+function getBunBackendCommand() {
+  const baseDir = getBackendBunDir();
+  if (!app.isPackaged) {
+    return {
+      command: "bun",
+      args: ["run", "src/index.ts"],
+      cwd: baseDir,
+    };
+  }
+  const binaryPath = getBackendBunBinaryPath();
+  if (binaryPath) {
+    return {
+      command: binaryPath,
+      args: [],
+      cwd: path.dirname(binaryPath),
+    };
+  }
+  return {
+    command: "bun",
+    args: ["run", "src/index.ts"],
+    cwd: baseDir,
+  };
+}
+
+function getBackendCommand() {
+  const backendType = getBackendType();
+  if (backendType === "bun") {
+    return getBunBackendCommand();
+  }
+  return getPythonBackendCommand();
 }
 
 function streamLogs(stream: NodeJS.ReadableStream, level: BackendLogLevel) {
@@ -187,6 +238,7 @@ export async function startBackend() {
       lastError: null,
     });
 
+    const backendType = getBackendType();
     const { command, args, cwd } = getBackendCommand();
     if (!fs.existsSync(cwd)) {
       const message = `backend directory not found: ${cwd}`;
@@ -194,27 +246,32 @@ export async function startBackend() {
       updateBackendState({ status: "error", lastError: message });
       return backendState;
     }
-    if (app.isPackaged && !fs.existsSync(command)) {
+    if (backendType === "python" && app.isPackaged && !fs.existsSync(command)) {
       const message = `backend python not found: ${command}`;
       emitBackendLog("error", message);
       updateBackendState({ status: "error", lastError: message });
       return backendState;
     }
-    emitBackendLog("info", `backend spawn: ${command} ${args.join(" ")}`);
+    emitBackendLog(
+      "info",
+      `backend spawn [${backendType}]: ${command} ${args.join(" ")}`
+    );
 
     const runtime = await refreshRuntimeStatus();
-    const env = applyRuntimeEnv(
-      {
-        ...process.env,
-        BACKEND_PORT: String(port),
-        BACKEND_TOKEN: token,
-        APP_DATA_DIR: dataDir,
-        LOG_DIR: logDir,
-        RUN_ENV: app.isPackaged ? "prod" : "dev",
-        PYTHONUNBUFFERED: "1",
-      },
-      runtime
-    );
+    const baseEnv: Record<string, string> = {
+      ...process.env,
+      BACKEND_PORT: String(port),
+      BACKEND_TOKEN: token,
+      APP_DATA_DIR: dataDir,
+      LOG_DIR: logDir,
+      RUN_ENV: app.isPackaged ? "prod" : "dev",
+    } as Record<string, string>;
+
+    if (backendType === "python") {
+      baseEnv.PYTHONUNBUFFERED = "1";
+    }
+
+    const env = applyRuntimeEnv(baseEnv, runtime);
 
     backendProcess = spawn(command, args, {
       cwd,
