@@ -9,7 +9,8 @@
       "Bash(pnpm tsc:check:*)",
       "Bash(npx tsc:*)",
       "WebSearch",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }
