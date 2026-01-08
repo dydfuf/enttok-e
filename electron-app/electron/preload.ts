@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   BackendLog,
   BackendState,
+  ClaudeSession,
+  ClaudeSessionDetailResult,
+  ClaudeSessionListResult,
   ElectronAPI,
   GitHubDailySummary,
   GitHubStatus,
@@ -126,6 +129,32 @@ const api: ElectronAPI = {
   setWorkTimeNotifications: (settings: WorkTimeNotificationSettings) =>
     ipcRenderer.invoke("notifications:set-settings", settings),
   testNotification: () => ipcRenderer.invoke("notifications:test"),
+
+  // Claude Code Sessions API
+  listClaudeProjects: () =>
+    ipcRenderer.invoke("claude-sessions:list-projects") as Promise<string[]>,
+  listClaudeSessions: (projectPath: string) =>
+    ipcRenderer.invoke(
+      "claude-sessions:list",
+      projectPath
+    ) as Promise<ClaudeSessionListResult>,
+  getClaudeSessionDetail: (sessionFilePath: string) =>
+    ipcRenderer.invoke(
+      "claude-sessions:detail",
+      sessionFilePath
+    ) as Promise<ClaudeSessionDetailResult>,
+  getClaudeSessionsForDate: (projectPath: string, date: string) =>
+    ipcRenderer.invoke(
+      "claude-sessions:for-date",
+      projectPath,
+      date
+    ) as Promise<ClaudeSession[]>,
+  getClaudeProjectPaths: () =>
+    ipcRenderer.invoke("claude-sessions:get-project-paths") as Promise<
+      string[]
+    >,
+  setClaudeProjectPaths: (projectPaths: string[]) =>
+    ipcRenderer.invoke("claude-sessions:set-project-paths", projectPaths),
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);

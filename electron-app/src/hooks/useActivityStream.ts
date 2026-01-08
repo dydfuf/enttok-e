@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, formatDistanceToNow, isValid, parseISO, subHours } from "date-fns";
 import { useGitHub } from "@/contexts/GitHubContext";
+import { useClaudeSessions } from "@/contexts/ClaudeSessionsContext";
 import { useActivityEvents } from "@/hooks/useActivityEvents";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
@@ -67,6 +68,13 @@ export function useActivityStream(): ActivityStreamState {
 		refreshSummary,
 	} = useGitHub();
 
+	const {
+		sessions: claudeSessions,
+		loading: claudeLoading,
+		error: claudeError,
+		refreshSessions: refreshClaudeSessions,
+	} = useClaudeSessions();
+
 	const { primaryCalendarIds } = useCalendar();
 
 	const [rangeEnd, setRangeEnd] = useState(() => new Date());
@@ -114,8 +122,9 @@ export function useActivityStream(): ActivityStreamState {
 			refreshSummary(),
 			reloadCalendar(),
 			reloadActivity(),
+			refreshClaudeSessions(),
 		]);
-	}, [refreshGitHub, refreshSummary, reloadActivity, reloadCalendar]);
+	}, [refreshGitHub, refreshSummary, reloadActivity, reloadCalendar, refreshClaudeSessions]);
 
 	const calendarEntries = useMemo<ActivityEntry[]>(() => {
 		return events
@@ -232,16 +241,46 @@ export function useActivityStream(): ActivityStreamState {
 			.filter((entry): entry is ActivityEntry => Boolean(entry));
 	}, [activityEvents]);
 
+	const claudeEntries = useMemo<ActivityEntry[]>(() => {
+		const rangeStartMs = rangeStart.getTime();
+		const rangeEndMs = rangeEnd.getTime();
+		const entries: ActivityEntry[] = [];
+
+		for (const session of claudeSessions) {
+			const timestamp = toTimestamp(session.timestamp);
+			if (!timestamp) continue;
+			if (timestamp < rangeStartMs || timestamp > rangeEndMs) {
+				continue;
+			}
+
+			const description = session.firstMessage
+				? session.firstMessage.slice(0, 100) + (session.firstMessage.length > 100 ? "..." : "")
+				: `${session.messageCount} messages`;
+
+			entries.push({
+				id: `claude:session:${session.id}`,
+				title: session.summary || "Claude Session",
+				description,
+				source: "claude",
+				sourceLabel: "Claude Code",
+				time: formatRelativeTime(timestamp),
+				timestamp,
+			});
+		}
+
+		return entries;
+	}, [claudeSessions, rangeStart, rangeEnd]);
+
 	const activities = useMemo<ActivityItemData[]>(() => {
-		const entries = [...calendarEntries, ...gitHubEntries, ...atlassianEntries];
+		const entries = [...calendarEntries, ...gitHubEntries, ...atlassianEntries, ...claudeEntries];
 		entries.sort((a, b) => b.timestamp - a.timestamp);
 		return entries.slice(0, MAX_ACTIVITY_ITEMS).map(({ timestamp, ...rest }) => rest);
-	}, [calendarEntries, gitHubEntries, atlassianEntries]);
+	}, [calendarEntries, gitHubEntries, atlassianEntries, claudeEntries]);
 
 	return {
 		activities,
-		isLoading: gitHubLoading || calendarLoading || activityLoading,
-		error: gitHubError || calendarError || activityError,
+		isLoading: gitHubLoading || calendarLoading || activityLoading || claudeLoading,
+		error: gitHubError || calendarError || activityError || claudeError,
 		refresh,
 	};
 }

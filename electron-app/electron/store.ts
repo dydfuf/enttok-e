@@ -25,6 +25,8 @@ interface StoreSchema {
   assetsFolder: string;
   gitHubRepoPaths: string[];
   workTimeNotifications: WorkTimeNotificationSettings;
+  claudeProjectPaths: string[];
+  claudeProjectPath?: string | null;
 }
 
 const DEFAULT_DAILY_NOTE_TEMPLATE = `---
@@ -63,6 +65,8 @@ const store = new Store<StoreSchema>({
       workStartMessage: "출근 시간입니다! 오늘의 업무를 정리해보세요.",
       workEndMessage: "퇴근 시간입니다! 오늘 하루를 마무리해보세요.",
     },
+    claudeProjectPaths: [],
+    claudeProjectPath: null,
   },
 });
 
@@ -169,4 +173,37 @@ export function setWorkTimeNotifications(
   settings: WorkTimeNotificationSettings
 ): void {
   store.set("workTimeNotifications", settings);
+}
+
+function normalizeClaudeProjectPaths(paths: string[]): string[] {
+  const unique = new Set<string>();
+  for (const value of paths) {
+    if (!value) continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const normalized = path.normalize(trimmed);
+    if (unique.has(normalized)) continue;
+    unique.add(normalized);
+  }
+  return Array.from(unique);
+}
+
+export function getClaudeProjectPaths(): string[] {
+  const stored = store.get("claudeProjectPaths");
+  if (stored && stored.length > 0) {
+    return normalizeClaudeProjectPaths(stored);
+  }
+  const legacy = store.get("claudeProjectPath");
+  if (legacy) {
+    const normalized = normalizeClaudeProjectPaths([legacy]);
+    store.set("claudeProjectPaths", normalized);
+    return normalized;
+  }
+  return [];
+}
+
+export function setClaudeProjectPaths(paths: string[]): void {
+  const normalized = normalizeClaudeProjectPaths(paths);
+  store.set("claudeProjectPaths", normalized);
+  store.set("claudeProjectPath", normalized.length === 1 ? normalized[0] : null);
 }

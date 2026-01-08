@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarDays, FileText, Github, Slack, SquareKanban } from "lucide-react";
+import { Bot, CalendarDays, FileText, Github, Slack, SquareKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -9,25 +9,46 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useGitHub } from "@/contexts/GitHubContext";
+import { useClaudeSessions } from "@/contexts/ClaudeSessionsContext";
 import { useAtlassian } from "@/hooks/useAtlassian";
 
 export const Route = createFileRoute("/_app/integrations/")({
 	component: IntegrationsIndexPage,
 });
 
+function getProjectLabel(projectPath: string): string {
+	const parts = projectPath.split("/").filter(Boolean);
+	return parts[parts.length - 1] || projectPath;
+}
+
 function IntegrationsIndexPage() {
 	const { status } = useGitHub();
+	const { selectedProjects } = useClaudeSessions();
 	const jira = useAtlassian("jira");
 	const confluence = useAtlassian("confluence");
 
 	const isGitHubConnected =
 		status?.cli.found === true && status?.auth.authenticated === true;
+	const isClaudeConnected = selectedProjects.length > 0;
 	const jiraAccount = jira.accounts[0];
 	const confluenceAccount = confluence.accounts[0];
 	const isJiraConnected = Boolean(jiraAccount);
 	const isConfluenceConnected = Boolean(confluenceAccount);
+	const claudeDescription = isClaudeConnected
+		? selectedProjects.length === 1
+			? `Connected to ${getProjectLabel(selectedProjects[0])}`
+			: `Connected to ${selectedProjects.length} projects`
+		: "Sync Claude Code sessions to Activity Stream";
 
 	const integrations = [
+		{
+			id: "claude",
+			name: "Claude Code",
+			description: claudeDescription,
+			icon: Bot,
+			connected: isClaudeConnected,
+			route: "/integrations/claude",
+		},
 		{
 			id: "calendar",
 			name: "Calendar",

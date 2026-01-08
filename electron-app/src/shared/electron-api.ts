@@ -191,6 +191,45 @@ export type WorkTimeNotificationSettings = {
   workEndMessage: string;
 };
 
+// Claude Code Session Types
+export type ClaudeSessionMessage = {
+  type: "user" | "assistant" | "system" | "summary";
+  timestamp?: string;
+  sessionId?: string;
+  gitBranch?: string;
+  cwd?: string;
+  summary?: string;
+  message?: {
+    role: string;
+    content: string | Array<{ type: string; text?: string; thinking?: string }>;
+  };
+};
+
+export type ClaudeSession = {
+  id: string;
+  summary: string;
+  firstMessage: string;
+  timestamp: string;
+  messageCount: number;
+  gitBranch: string;
+  projectPath: string;
+  filePath: string;
+};
+
+export type ClaudeSessionListResult = {
+  success: boolean;
+  sessions: ClaudeSession[];
+  projectPath: string | null;
+  error: string | null;
+};
+
+export type ClaudeSessionDetailResult = {
+  success: boolean;
+  session: ClaudeSession | null;
+  messages: ClaudeSessionMessage[];
+  error: string | null;
+};
+
 export type ElectronAPI = {
   send: (channel: string, data: unknown) => void;
   receive: (channel: string, func: (...args: unknown[]) => void) => void;
@@ -245,4 +284,18 @@ export type ElectronAPI = {
     settings: WorkTimeNotificationSettings
   ) => Promise<{ success: boolean }>;
   testNotification: () => Promise<{ success: boolean }>;
+  // Claude Code Sessions
+  listClaudeProjects: () => Promise<string[]>;
+  listClaudeSessions: (projectPath: string) => Promise<ClaudeSessionListResult>;
+  getClaudeSessionDetail: (
+    sessionFilePath: string
+  ) => Promise<ClaudeSessionDetailResult>;
+  getClaudeSessionsForDate: (
+    projectPath: string,
+    date: string
+  ) => Promise<ClaudeSession[]>;
+  getClaudeProjectPaths: () => Promise<string[]>;
+  setClaudeProjectPaths: (
+    projectPaths: string[]
+  ) => Promise<{ success: boolean }>;
 };

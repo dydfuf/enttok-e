@@ -5,6 +5,7 @@ import {
   FileText,
   Code,
   MessageSquare,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,8 @@ export type ActivitySource =
   | "jira"
   | "confluence"
   | "github"
-  | "slack";
+  | "slack"
+  | "claude";
 
 export interface ActivityItemData {
   id: string;
@@ -60,6 +62,11 @@ const sourceConfig: Record<
     icon: MessageSquare,
     color: "text-purple-500",
     bgColor: "bg-purple-500",
+  },
+  claude: {
+    icon: Bot,
+    color: "text-orange-500",
+    bgColor: "bg-orange-500",
   },
 };
 

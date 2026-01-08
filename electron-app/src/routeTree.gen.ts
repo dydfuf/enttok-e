@@ -27,6 +27,7 @@ import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes/$noteId'
 import { Route as AppIntegrationsJiraRouteImport } from './routes/_app/integrations/jira'
 import { Route as AppIntegrationsGithubRouteImport } from './routes/_app/integrations/github'
 import { Route as AppIntegrationsConfluenceRouteImport } from './routes/_app/integrations/confluence'
+import { Route as AppIntegrationsClaudeRouteImport } from './routes/_app/integrations/claude'
 import { Route as AppIntegrationsCalendarRouteImport } from './routes/_app/integrations/calendar'
 import { Route as AppDailyDateRouteImport } from './routes/_app/daily.$date'
 
@@ -120,6 +121,11 @@ const AppIntegrationsConfluenceRoute =
     path: '/confluence',
     getParentRoute: () => AppIntegrationsRoute,
   } as any)
+const AppIntegrationsClaudeRoute = AppIntegrationsClaudeRouteImport.update({
+  id: '/claude',
+  path: '/claude',
+  getParentRoute: () => AppIntegrationsRoute,
+} as any)
 const AppIntegrationsCalendarRoute = AppIntegrationsCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/tags': typeof AppTagsRouteWithChildren
   '/daily/$date': typeof AppDailyDateRoute
   '/integrations/calendar': typeof AppIntegrationsCalendarRoute
+  '/integrations/claude': typeof AppIntegrationsClaudeRoute
   '/integrations/confluence': typeof AppIntegrationsConfluenceRoute
   '/integrations/github': typeof AppIntegrationsGithubRoute
   '/integrations/jira': typeof AppIntegrationsJiraRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/daily/$date': typeof AppDailyDateRoute
   '/integrations/calendar': typeof AppIntegrationsCalendarRoute
+  '/integrations/claude': typeof AppIntegrationsClaudeRoute
   '/integrations/confluence': typeof AppIntegrationsConfluenceRoute
   '/integrations/github': typeof AppIntegrationsGithubRoute
   '/integrations/jira': typeof AppIntegrationsJiraRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/_app/tags': typeof AppTagsRouteWithChildren
   '/_app/daily/$date': typeof AppDailyDateRoute
   '/_app/integrations/calendar': typeof AppIntegrationsCalendarRoute
+  '/_app/integrations/claude': typeof AppIntegrationsClaudeRoute
   '/_app/integrations/confluence': typeof AppIntegrationsConfluenceRoute
   '/_app/integrations/github': typeof AppIntegrationsGithubRoute
   '/_app/integrations/jira': typeof AppIntegrationsJiraRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/tags'
     | '/daily/$date'
     | '/integrations/calendar'
+    | '/integrations/claude'
     | '/integrations/confluence'
     | '/integrations/github'
     | '/integrations/jira'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/daily/$date'
     | '/integrations/calendar'
+    | '/integrations/claude'
     | '/integrations/confluence'
     | '/integrations/github'
     | '/integrations/jira'
@@ -244,6 +255,7 @@ export interface FileRouteTypes {
     | '/_app/tags'
     | '/_app/daily/$date'
     | '/_app/integrations/calendar'
+    | '/_app/integrations/claude'
     | '/_app/integrations/confluence'
     | '/_app/integrations/github'
     | '/_app/integrations/jira'
@@ -388,6 +400,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIntegrationsConfluenceRouteImport
       parentRoute: typeof AppIntegrationsRoute
     }
+    '/_app/integrations/claude': {
+      id: '/_app/integrations/claude'
+      path: '/claude'
+      fullPath: '/integrations/claude'
+      preLoaderRoute: typeof AppIntegrationsClaudeRouteImport
+      parentRoute: typeof AppIntegrationsRoute
+    }
     '/_app/integrations/calendar': {
       id: '/_app/integrations/calendar'
       path: '/calendar'
@@ -421,6 +440,7 @@ const AppDailyRouteWithChildren = AppDailyRoute._addFileChildren(
 
 interface AppIntegrationsRouteChildren {
   AppIntegrationsCalendarRoute: typeof AppIntegrationsCalendarRoute
+  AppIntegrationsClaudeRoute: typeof AppIntegrationsClaudeRoute
   AppIntegrationsConfluenceRoute: typeof AppIntegrationsConfluenceRoute
   AppIntegrationsGithubRoute: typeof AppIntegrationsGithubRoute
   AppIntegrationsJiraRoute: typeof AppIntegrationsJiraRoute
@@ -429,6 +449,7 @@ interface AppIntegrationsRouteChildren {
 
 const AppIntegrationsRouteChildren: AppIntegrationsRouteChildren = {
   AppIntegrationsCalendarRoute: AppIntegrationsCalendarRoute,
+  AppIntegrationsClaudeRoute: AppIntegrationsClaudeRoute,
   AppIntegrationsConfluenceRoute: AppIntegrationsConfluenceRoute,
   AppIntegrationsGithubRoute: AppIntegrationsGithubRoute,
   AppIntegrationsJiraRoute: AppIntegrationsJiraRoute,
