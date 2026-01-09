@@ -6,7 +6,13 @@ import {
   highlightActiveLine,
 } from "@codemirror/view";
 import { EditorState, Compartment } from "@codemirror/state";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentLess,
+  indentWithTab,
+} from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import {
@@ -202,8 +208,16 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 const BARE_URL_REGEX =
-  /(?:https?:\/\/|www\.)[^\s<>()]+|mailto:[^\s<>()]+/gi;
+  /(?:https?:\/\/|www\.|mailto:|obsidian:\/\/)[^\s<>()]+/gi;
 const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
+
+function isEscaped(text: string, index: number): boolean {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && text[i] === "\\"; i--) {
+    backslashes += 1;
+  }
+  return backslashes % 2 === 1;
+}
 
 function stripTrailingPunctuation(url: string): string {
   let trimmed = url;
@@ -263,7 +277,7 @@ function coerceExternalUrlFromNormalized(normalized: string): string | null {
 function isAllowedExternalUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return ["http:", "https:", "mailto:"].includes(parsed.protocol);
+    return ["http:", "https:", "mailto:", "obsidian:"].includes(parsed.protocol);
   } catch {
     return false;
   }
@@ -322,6 +336,16 @@ function sanitizeNoteTitle(raw: string): string | null {
   return normalizeNoteTitle(title);
 }
 
+function extractNoteTitleFromPath(rawPath: string): string | null {
+  const normalized = rawPath.replace(/\\/g, "/");
+  const pathPart = normalized.split(/[?#]/)[0];
+  if (!pathPart) {
+    return null;
+  }
+  const fileName = pathPart.split("/").pop() ?? pathPart;
+  return sanitizeNoteTitle(fileName);
+}
+
 function parseNoteTitleFromLinkTarget(raw: string): string | null {
   const normalized = normalizeLinkTarget(raw);
   if (!normalized) {
@@ -330,6 +354,14 @@ function parseNoteTitleFromLinkTarget(raw: string): string | null {
   const noteMatch = normalized.match(/^note:(\/\/)?(.+)$/i);
   if (noteMatch) {
     return sanitizeNoteTitle(noteMatch[2]);
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
+    return null;
+  }
+  const pathPart = normalized.split(/[?#]/)[0];
+  const lower = pathPart.toLowerCase();
+  if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
+    return extractNoteTitleFromPath(pathPart);
   }
   return null;
 }
@@ -345,6 +377,12 @@ function findWikiLinkTarget(
 ): string | null {
   for (const match of lineText.matchAll(WIKI_LINK_REGEX)) {
     const index = match.index ?? 0;
+    if (index > 0 && lineText[index - 1] === "!") {
+      continue;
+    }
+    if (isEscaped(lineText, index)) {
+      continue;
+    }
     const from = lineStart + index;
     const to = from + match[0].length;
     if (pos < from || pos > to) {
@@ -404,6 +442,9 @@ function findLinkTargetAtPos(view: EditorView, pos: number): LinkTarget | null {
   }
   for (const match of line.text.matchAll(BARE_URL_REGEX)) {
     const index = match.index ?? 0;
+    if (isEscaped(line.text, index)) {
+      continue;
+    }
     const from = line.from + index;
     const to = from + match[0].length;
     if (pos >= from && pos <= to) {
@@ -633,10 +674,12 @@ export function LivePreviewEditor({
       }),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([
+        ...completionKeymap,
+        indentWithTab,
+        { key: "Shift-Tab", run: indentLess },
         ...defaultKeymap,
         ...historyKeymap,
         ...searchKeymap,
-        ...completionKeymap,
       ]),
       EditorView.domEventHandlers({
         paste: (event, view) => {

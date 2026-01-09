@@ -40,8 +40,36 @@ class CheckboxWidget extends WidgetType {
   }
 }
 
+class ListMarkerWidget extends WidgetType {
+  constructor(readonly marker: string, readonly ordered: boolean) {
+    super();
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = this.ordered
+      ? "cm-md-list-bullet cm-md-list-bullet-ordered"
+      : "cm-md-list-bullet cm-md-list-bullet-unordered";
+    span.textContent = this.ordered ? this.marker : "\u2022";
+    return span;
+  }
+
+  eq(other: ListMarkerWidget): boolean {
+    return other.marker === this.marker && other.ordered === this.ordered;
+  }
+
+  ignoreEvent(): boolean {
+    return false;
+  }
+}
+
 class ImageWidget extends WidgetType {
-  constructor(readonly src: string, readonly alt: string) {
+  constructor(
+    readonly src: string,
+    readonly alt: string,
+    readonly width?: number,
+    readonly height?: number
+  ) {
     super();
   }
 
@@ -53,13 +81,59 @@ class ImageWidget extends WidgetType {
     image.src = this.src;
     image.alt = this.alt;
     image.loading = "lazy";
+    if (this.width) {
+      image.style.width = `${this.width}px`;
+    }
+    if (this.height) {
+      image.style.height = `${this.height}px`;
+    }
 
     wrapper.appendChild(image);
     return wrapper;
   }
 
   eq(other: ImageWidget): boolean {
-    return other.src === this.src && other.alt === this.alt;
+    return (
+      other.src === this.src &&
+      other.alt === this.alt &&
+      other.width === this.width &&
+      other.height === this.height
+    );
+  }
+}
+
+class HorizontalRuleWidget extends WidgetType {
+  toDOM(): HTMLElement {
+    const hr = document.createElement("hr");
+    hr.className = "cm-md-hr";
+    return hr;
+  }
+
+  eq(): boolean {
+    return true;
+  }
+}
+
+class CalloutTitleWidget extends WidgetType {
+  constructor(readonly type: string, readonly title: string | null) {
+    super();
+  }
+
+  toDOM(): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = `cm-md-callout-title cm-md-callout-${this.type}`;
+    const typeLabel =
+      this.type.length > 0
+        ? `${this.type[0].toUpperCase()}${this.type.slice(1)}`
+        : "Note";
+    wrapper.textContent = this.title
+      ? `${typeLabel}: ${this.title}`
+      : typeLabel;
+    return wrapper;
+  }
+
+  eq(other: CalloutTitleWidget): boolean {
+    return other.type === this.type && other.title === this.title;
   }
 }
 
@@ -91,6 +165,11 @@ export const italicDecoration = Decoration.mark({ class: "cm-md-italic" });
 export const codeDecoration = Decoration.mark({ class: "cm-md-code" });
 export const linkDecoration = Decoration.mark({ class: "cm-md-link" });
 export const strikethroughDecoration = Decoration.mark({ class: "cm-md-strikethrough" });
+export const highlightDecoration = Decoration.mark({ class: "cm-md-highlight" });
+export const subscriptDecoration = Decoration.mark({ class: "cm-md-subscript" });
+export const superscriptDecoration = Decoration.mark({ class: "cm-md-superscript" });
+export const footnoteDecoration = Decoration.mark({ class: "cm-md-footnote" });
+export const mathDecoration = Decoration.mark({ class: "cm-md-math" });
 
 // Heading decorations
 export const heading1Decoration = Decoration.mark({ class: "cm-md-heading cm-md-heading-1" });
@@ -102,20 +181,171 @@ export const heading6Decoration = Decoration.mark({ class: "cm-md-heading cm-md-
 
 export const quoteDecoration = Decoration.mark({ class: "cm-md-quote" });
 export const listMarkerDecoration = Decoration.mark({ class: "cm-md-list-marker" });
+export const codeBlockDecoration = Decoration.mark({ class: "cm-md-code-block" });
+export const tableDecoration = Decoration.mark({ class: "cm-md-table" });
+export const mathBlockLineDecoration = Decoration.line({ class: "cm-md-math-block-line" });
+export const codeBlockLineDecoration = Decoration.line({ class: "cm-md-code-block-line" });
+export const tableLineDecoration = Decoration.line({ class: "cm-md-table-line" });
 
 // Task list decorations
 export const taskTextCheckedDecoration = Decoration.mark({ class: "cm-md-task-checked" });
 
 const BARE_URL_REGEX =
-  /(?:https?:\/\/|www\.)[^\s<>()]+|mailto:[^\s<>()]+/gi;
+  /(?:https?:\/\/|www\.|mailto:|obsidian:\/\/)[^\s<>()]+/gi;
 const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
+const WIKI_EMBED_REGEX = /!\[\[([^\]]+)\]\]/g;
+const FOOTNOTE_REF_REGEX = /\[\^([^\]]+)\]/g;
+const FOOTNOTE_DEF_REGEX = /^(\s*)\[\^([^\]]+)\]:\s*/;
+const TASK_LIST_REGEX = /^(\s*)([-*+]|\d+[.)])\s\[([^\]])\]\s/;
+const INLINE_MATH_REGEX = /\$([^$]+?)\$/g;
+const COMMENT_MARKER = "%%";
+const MATH_BLOCK_DELIMITER = "$$";
+const HIGHLIGHT_MARKER = "==";
 const LINK_CONTAINER_NODES = new Set(["Link", "Image", "Autolink", "URL"]);
+const INLINE_DECORATION_SKIP_NODES = new Set([
+  "InlineCode",
+  "CodeText",
+  "FencedCode",
+  "CodeBlock",
+  "HTMLBlock",
+  "Link",
+  "Image",
+  "Autolink",
+  "URL",
+]);
+const IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "heic",
+  "heif",
+]);
+const CALLOUT_LINE_DECORATIONS = new Map<string, Decoration>();
 
 // Type for decoration builder
 type DecorationBuilder = {
   add: (from: number, to: number, deco: Decoration) => void;
   addWidget: (pos: number, widget: WidgetType, side?: number) => void;
+  addLine: (pos: number, deco: Decoration) => void;
 };
+
+function isEscaped(text: string, index: number): boolean {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && text[i] === "\\"; i--) {
+    backslashes += 1;
+  }
+  return backslashes % 2 === 1;
+}
+
+function isInsideNodes(node: SyntaxNode | null, names: Set<string>): boolean {
+  let current: SyntaxNode | null = node;
+  while (current) {
+    if (names.has(current.name)) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+function shouldSkipInlineDecoration(node: SyntaxNode | null): boolean {
+  return isInsideNodes(node, INLINE_DECORATION_SKIP_NODES);
+}
+
+function parseImageAlt(rawAlt: string): {
+  alt: string;
+  width?: number;
+  height?: number;
+} {
+  const trimmed = rawAlt.trim();
+  if (!trimmed) {
+    return { alt: "" };
+  }
+  const pipeIndex = trimmed.lastIndexOf("|");
+  if (pipeIndex === -1) {
+    return { alt: trimmed };
+  }
+  const sizePart = trimmed.slice(pipeIndex + 1).trim();
+  const sizeMatch = sizePart.match(/^(\d+)(x(\d+))?$/i);
+  if (!sizeMatch) {
+    return { alt: trimmed };
+  }
+  const width = Number(sizeMatch[1]);
+  const height = sizeMatch[3] ? Number(sizeMatch[3]) : undefined;
+  const alt = trimmed.slice(0, pipeIndex).trim();
+  return { alt, width, height };
+}
+
+type WikiLinkParts = {
+  target: string;
+  display: string;
+  width?: number;
+  height?: number;
+};
+
+function parseWikiLinkParts(raw: string): WikiLinkParts | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const pipeIndex = trimmed.indexOf("|");
+  if (pipeIndex === -1) {
+    return { target: trimmed, display: trimmed };
+  }
+  const target = trimmed.slice(0, pipeIndex).trim();
+  const suffix = trimmed.slice(pipeIndex + 1).trim();
+  if (!suffix) {
+    return { target, display: target };
+  }
+  const sizeMatch = suffix.match(/^(\d+)(x(\d+))?$/i);
+  if (sizeMatch) {
+    return {
+      target,
+      display: target,
+      width: Number(sizeMatch[1]),
+      height: sizeMatch[3] ? Number(sizeMatch[3]) : undefined,
+    };
+  }
+  return { target, display: suffix };
+}
+
+function isImagePath(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const withoutAnchor = trimmed.split("#")[0].split("^")[0];
+  const extension = withoutAnchor.split(".").pop()?.toLowerCase();
+  if (!extension) {
+    return false;
+  }
+  return IMAGE_EXTENSIONS.has(extension);
+}
+
+function stripWikiAnchor(raw: string): string {
+  return raw.split("#")[0].split("^")[0].trim();
+}
+
+function normalizeCalloutType(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || "note";
+}
+
+function getCalloutLineDecoration(type: string): Decoration {
+  const normalized = normalizeCalloutType(type);
+  const cached = CALLOUT_LINE_DECORATIONS.get(normalized);
+  if (cached) {
+    return cached;
+  }
+  const deco = Decoration.line({
+    class: `cm-md-callout-line cm-md-callout-${normalized}`,
+  });
+  CALLOUT_LINE_DECORATIONS.set(normalized, deco);
+  return deco;
+}
 
 // Process inline emphasis (bold, italic)
 function processEmphasis(
@@ -153,6 +383,8 @@ function processEmphasis(
 type ImageMatch = {
   alt: string;
   url: string;
+  width?: number;
+  height?: number;
 };
 
 function parseImageMarkdown(text: string): ImageMatch | null {
@@ -160,7 +392,8 @@ function parseImageMarkdown(text: string): ImageMatch | null {
   if (!match) {
     return null;
   }
-  const alt = match[1];
+  const altInfo = parseImageAlt(match[1]);
+  const alt = altInfo.alt;
   let url = match[2].trim();
   if (!url) {
     return null;
@@ -175,7 +408,7 @@ function parseImageMarkdown(text: string): ImageMatch | null {
   if (!url) {
     return null;
   }
-  return { alt, url };
+  return { alt, url, width: altInfo.width, height: altInfo.height };
 }
 
 function processImage(
@@ -200,7 +433,11 @@ function processImage(
   }
 
   builder.add(from, to, hiddenMarkerDecoration);
-  builder.addWidget(from, new ImageWidget(resolvedSrc, parsed.alt), 1);
+  builder.addWidget(
+    from,
+    new ImageWidget(resolvedSrc, parsed.alt, parsed.width, parsed.height),
+    1
+  );
 }
 
 // Process inline code
@@ -213,12 +450,24 @@ function processInlineCode(
 
   if (isLineWithCursor(view, from)) return;
 
-  // Hide opening backtick
-  builder.add(from, from + 1, hiddenMarkerDecoration);
+  const text = view.state.doc.sliceString(from, to);
+  const match = text.match(/^(`+)([\s\S]*?)\1$/);
+  if (!match) {
+    return;
+  }
+  const markerLength = match[1].length;
+  const contentStart = from + markerLength;
+  const contentEnd = to - markerLength;
+  if (contentEnd <= contentStart) {
+    return;
+  }
+
+  // Hide opening backticks
+  builder.add(from, contentStart, hiddenMarkerDecoration);
   // Apply code style
-  builder.add(from + 1, to - 1, codeDecoration);
-  // Hide closing backtick
-  builder.add(to - 1, to, hiddenMarkerDecoration);
+  builder.add(contentStart, contentEnd, codeDecoration);
+  // Hide closing backticks
+  builder.add(contentEnd, to, hiddenMarkerDecoration);
 }
 
 // Process links
@@ -328,19 +577,47 @@ function processBlockquote(
   view: EditorView,
   builder: DecorationBuilder
 ) {
-  const { from } = node;
-  const line = view.state.doc.lineAt(from);
+  const { from, to } = node;
+  if (isCursorInRange(view, from, to)) return;
 
-  if (isLineWithCursor(view, from)) return;
+  const doc = view.state.doc;
+  let line = doc.lineAt(from);
+  const firstLine = line;
+  const endLine = doc.lineAt(to);
 
-  const lineText = view.state.doc.sliceString(line.from, line.to);
-  const match = lineText.match(/^>\s?/);
+  const firstLineText = firstLine.text;
+  const calloutMatch = firstLineText.match(
+    /^>\s*\[!([^\]]+)\]([+-])?\s*(.*)$/
+  );
+  const calloutType = calloutMatch ? normalizeCalloutType(calloutMatch[1]) : null;
+  const calloutTitle = calloutMatch
+    ? calloutMatch[3]?.trim() || null
+    : null;
 
-  if (match) {
-    // Hide > marker
-    builder.add(line.from, line.from + match[0].length, hiddenMarkerDecoration);
-    // Apply quote style to content
-    builder.add(line.from + match[0].length, line.to, quoteDecoration);
+  while (true) {
+    const lineText = line.text;
+    const match = lineText.match(/^>\s?/);
+    if (match) {
+      builder.add(line.from, line.from + match[0].length, hiddenMarkerDecoration);
+      builder.add(line.from + match[0].length, line.to, quoteDecoration);
+      if (calloutType) {
+        builder.addLine(line.from, getCalloutLineDecoration(calloutType));
+      }
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = doc.line(line.number + 1);
+  }
+
+  if (calloutType) {
+    builder.add(firstLine.from, firstLine.to, hiddenMarkerDecoration);
+    builder.addWidget(
+      firstLine.from,
+      new CalloutTitleWidget(calloutType, calloutTitle),
+      1
+    );
   }
 }
 
@@ -357,18 +634,30 @@ function processListItem(
 
   const lineText = view.state.doc.sliceString(line.from, line.to);
 
-  // Match unordered list markers (-, *, +) or ordered (1., 2., etc.)
-  const match = lineText.match(/^(\s*)([-*+]|\d+\.)\s/);
+  if (TASK_LIST_REGEX.test(lineText)) {
+    return;
+  }
+
+  // Match unordered list markers (-, *, +) or ordered list markers (1., 2., 1))
+  const match = lineText.match(/^(\s*)([-*+]|\d+[.)])\s/);
 
   if (match) {
     const indentLength = match[1].length;
     const markerLength = match[2].length + 1; // marker + space
+    const markerFrom = line.from + indentLength;
+    const markerTo = markerFrom + markerLength;
 
-    // Apply list marker style
+    if (isLineWithCursor(view, from)) {
+      builder.add(markerFrom, markerTo, listMarkerDecoration);
+      return;
+    }
+
+    const isOrdered = /^\d/.test(match[2]);
+    const widget = new ListMarkerWidget(match[2], isOrdered);
     builder.add(
-      line.from + indentLength,
-      line.from + indentLength + markerLength,
-      listMarkerDecoration
+      markerFrom,
+      markerTo,
+      Decoration.replace({ widget, inclusive: false })
     );
   }
 }
@@ -376,6 +665,7 @@ function processListItem(
 // Process task list items (checkboxes)
 function processTaskList(
   view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
   builder: DecorationBuilder
 ) {
   const doc = view.state.doc;
@@ -384,22 +674,26 @@ function processTaskList(
   for (let i = 1; i <= doc.lines; i++) {
     const line = doc.line(i);
     const lineText = line.text;
+    const node = tree.resolveInner(line.from, 1);
+    if (shouldSkipInlineDecoration(node)) {
+      continue;
+    }
 
-    // Match task list pattern: - [ ] or - [x] or * [ ] or * [x]
-    const match = lineText.match(/^(\s*)([-*+])\s\[([ xX])\]\s/);
+    // Match task list pattern for any list marker and any task symbol
+    const match = lineText.match(TASK_LIST_REGEX);
 
     if (match) {
       if (isLineWithCursor(view, line.from)) continue;
 
       const indentLength = match[1].length;
-      const markerLength = match[2].length; // - or * or +
-      const isChecked = match[3].toLowerCase() === "x";
+      const markerLength = match[2].length; // - or * or + or 1.
+      const isChecked = match[3] !== " ";
 
       // Position of the character inside [ ]
       const checkboxCharPos = line.from + indentLength + markerLength + 2; // "- [" = 3 chars
 
       // Hide the list marker and checkbox syntax: "- [ ] " or "- [x] "
-      const syntaxEnd = line.from + indentLength + markerLength + 5; // "- [x] " = 6 chars
+      const syntaxEnd = line.from + indentLength + markerLength + 5; // marker + " [x] "
       builder.add(line.from + indentLength, syntaxEnd, hiddenMarkerDecoration);
 
       // Add checkbox widget
@@ -414,6 +708,355 @@ function processTaskList(
         builder.add(syntaxEnd, line.to, taskTextCheckedDecoration);
       }
     }
+  }
+}
+
+function processSubSuper(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder,
+  decoration: Decoration
+) {
+  const { from, to } = node;
+  if (isLineWithCursor(view, from)) return;
+  if (to - from <= 2) return;
+
+  builder.add(from, from + 1, hiddenMarkerDecoration);
+  builder.add(from + 1, to - 1, decoration);
+  builder.add(to - 1, to, hiddenMarkerDecoration);
+}
+
+function processSetextHeading(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder,
+  level: number
+) {
+  const doc = view.state.doc;
+  const line = doc.lineAt(node.from);
+  const underlineLine =
+    line.number < doc.lines ? doc.line(line.number + 1) : null;
+
+  if (isLineWithCursor(view, line.from)) return;
+  if (underlineLine && isLineWithCursor(view, underlineLine.from)) return;
+
+  const headingDecos = [
+    heading1Decoration,
+    heading2Decoration,
+  ];
+  builder.add(line.from, line.to, headingDecos[level - 1] || heading1Decoration);
+
+  if (underlineLine) {
+    if (underlineLine.from < node.to) {
+      builder.add(underlineLine.from, underlineLine.to, hiddenMarkerDecoration);
+    }
+  }
+}
+
+function processHorizontalRule(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder
+) {
+  const line = view.state.doc.lineAt(node.from);
+  if (isLineWithCursor(view, line.from)) return;
+
+  builder.add(line.from, line.to, hiddenMarkerDecoration);
+  builder.addWidget(line.from, new HorizontalRuleWidget(), 1);
+}
+
+function isFenceLine(text: string): boolean {
+  return /^\s*(`{3,}|~{3,})/.test(text);
+}
+
+function processCodeBlock(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder
+) {
+  const { from, to } = node;
+  if (isCursorInRange(view, from, to)) return;
+
+  const doc = view.state.doc;
+  const startLine = doc.lineAt(from);
+  let line = startLine;
+  const endLine = doc.lineAt(to);
+  const isFenced = node.name === "FencedCode";
+
+  while (true) {
+    const fence =
+      isFenced &&
+      (line.number === startLine.number || line.number === endLine.number);
+    if (fence && isFenceLine(line.text)) {
+      builder.add(line.from, line.to, hiddenMarkerDecoration);
+    } else {
+      builder.add(line.from, line.to, codeBlockDecoration);
+      builder.addLine(line.from, codeBlockLineDecoration);
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = doc.line(line.number + 1);
+  }
+}
+
+function processTable(
+  node: SyntaxNodeRef,
+  view: EditorView,
+  builder: DecorationBuilder
+) {
+  const { from, to } = node;
+  if (isCursorInRange(view, from, to)) return;
+
+  const doc = view.state.doc;
+  let line = doc.lineAt(from);
+  const endLine = doc.lineAt(to);
+
+  while (true) {
+    builder.add(line.from, line.to, tableDecoration);
+    builder.addLine(line.from, tableLineDecoration);
+    if (!isLineWithCursor(view, line.from)) {
+      for (let i = 0; i < line.text.length; i++) {
+        if (line.text[i] === "|" && !isEscaped(line.text, i)) {
+          builder.add(line.from + i, line.from + i + 1, hiddenMarkerDecoration);
+        }
+      }
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = doc.line(line.number + 1);
+  }
+}
+
+function processHighlightsInRange(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder,
+  from: number,
+  to: number
+) {
+  let line = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+
+  while (true) {
+    if (!isLineWithCursor(view, line.from)) {
+      let index = 0;
+      while (index < line.text.length) {
+        const start = line.text.indexOf(HIGHLIGHT_MARKER, index);
+        if (start === -1) {
+          break;
+        }
+        if (isEscaped(line.text, start)) {
+          index = start + HIGHLIGHT_MARKER.length;
+          continue;
+        }
+        const end = line.text.indexOf(HIGHLIGHT_MARKER, start + 2);
+        if (end === -1) {
+          break;
+        }
+        if (isEscaped(line.text, end)) {
+          index = end + HIGHLIGHT_MARKER.length;
+          continue;
+        }
+        const contentStart = line.from + start + 2;
+        const contentEnd = line.from + end;
+        if (contentEnd > contentStart) {
+          const node = tree.resolveInner(contentStart, 1);
+          if (!shouldSkipInlineDecoration(node)) {
+            builder.add(line.from + start, line.from + start + 2, hiddenMarkerDecoration);
+            builder.add(contentStart, contentEnd, highlightDecoration);
+            builder.add(line.from + end, line.from + end + 2, hiddenMarkerDecoration);
+          }
+        }
+        index = end + 2;
+      }
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = view.state.doc.line(line.number + 1);
+  }
+}
+
+function processInlineMathInRange(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder,
+  from: number,
+  to: number
+) {
+  let line = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+
+  while (true) {
+    if (!isLineWithCursor(view, line.from)) {
+      if (line.text.trim() === MATH_BLOCK_DELIMITER) {
+        if (line.number === endLine.number) {
+          break;
+        }
+        line = view.state.doc.line(line.number + 1);
+        continue;
+      }
+      for (const match of line.text.matchAll(INLINE_MATH_REGEX)) {
+        const index = match.index ?? 0;
+        if (isEscaped(line.text, index)) {
+          continue;
+        }
+        const start = line.from + index;
+        const end = start + match[0].length;
+        const contentStart = start + 1;
+        const contentEnd = end - 1;
+        if (contentEnd <= contentStart) {
+          continue;
+        }
+        const node = tree.resolveInner(contentStart, 1);
+        if (shouldSkipInlineDecoration(node)) {
+          continue;
+        }
+        builder.add(start, start + 1, hiddenMarkerDecoration);
+        builder.add(contentStart, contentEnd, mathDecoration);
+        builder.add(end - 1, end, hiddenMarkerDecoration);
+      }
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = view.state.doc.line(line.number + 1);
+  }
+}
+
+function processFootnotesInRange(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder,
+  from: number,
+  to: number
+) {
+  let line = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+
+  while (true) {
+    const lineText = line.text;
+    const hasCursor = isLineWithCursor(view, line.from);
+    const lineNode = tree.resolveInner(line.from, 1);
+    if (shouldSkipInlineDecoration(lineNode)) {
+      if (line.number === endLine.number) {
+        break;
+      }
+      line = view.state.doc.line(line.number + 1);
+      continue;
+    }
+
+    const defMatch = lineText.match(FOOTNOTE_DEF_REGEX);
+    if (defMatch && !hasCursor) {
+      const indentLength = defMatch[1].length;
+      const markerStart = line.from + indentLength;
+      const markerEnd = line.from + defMatch[0].length;
+      builder.add(markerStart, markerEnd, hiddenMarkerDecoration);
+    }
+
+    for (const match of lineText.matchAll(FOOTNOTE_REF_REGEX)) {
+      const index = match.index ?? 0;
+      if (isEscaped(lineText, index)) {
+        continue;
+      }
+      const start = line.from + index;
+      const end = start + match[0].length;
+      const labelStart = start + 2;
+      const labelEnd = end - 1;
+      if (labelEnd <= labelStart || hasCursor) {
+        continue;
+      }
+      const node = tree.resolveInner(labelStart, 1);
+      if (shouldSkipInlineDecoration(node)) {
+        continue;
+      }
+      builder.add(start, start + 2, hiddenMarkerDecoration);
+      builder.add(labelStart, labelEnd, footnoteDecoration);
+      builder.add(labelEnd, end, hiddenMarkerDecoration);
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = view.state.doc.line(line.number + 1);
+  }
+}
+
+function processWikiEmbedsInRange(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder,
+  from: number,
+  to: number
+) {
+  let line = view.state.doc.lineAt(from);
+  const endLine = view.state.doc.lineAt(to);
+  const notePath = view.dom.dataset.filePath || null;
+
+  while (true) {
+    if (!isLineWithCursor(view, line.from)) {
+      for (const match of line.text.matchAll(
+        new RegExp(WIKI_EMBED_REGEX.source, WIKI_EMBED_REGEX.flags)
+      )) {
+        const index = match.index ?? 0;
+        if (isEscaped(line.text, index)) {
+          continue;
+        }
+        const raw = match[1];
+        const parts = parseWikiLinkParts(raw);
+        if (!parts) {
+          continue;
+        }
+        const start = line.from + index;
+        const end = start + match[0].length;
+        const node = tree.resolveInner(start + 1, 1);
+        if (shouldSkipInlineDecoration(node)) {
+          continue;
+        }
+        if (isImagePath(parts.target)) {
+          const resolvedSrc = resolveAssetUrl(
+            notePath,
+            stripWikiAnchor(parts.target)
+          );
+          if (!resolvedSrc) {
+            continue;
+          }
+          builder.add(start, end, hiddenMarkerDecoration);
+          builder.addWidget(
+            start,
+            new ImageWidget(resolvedSrc, parts.display, parts.width, parts.height),
+            1
+          );
+        } else {
+          const innerStart = start + 3;
+          const innerEnd = end - 2;
+          const pipeIndex = raw.indexOf("|");
+          if (pipeIndex !== -1) {
+            const aliasStart = innerStart + pipeIndex + 1;
+            if (aliasStart < innerEnd) {
+              builder.add(start, aliasStart, hiddenMarkerDecoration);
+              builder.add(aliasStart, innerEnd, linkDecoration);
+              builder.add(innerEnd, end, hiddenMarkerDecoration);
+            }
+          } else {
+            builder.add(start, innerStart, hiddenMarkerDecoration);
+            builder.add(innerStart, innerEnd, linkDecoration);
+            builder.add(innerEnd, end, hiddenMarkerDecoration);
+          }
+        }
+      }
+    }
+
+    if (line.number === endLine.number) {
+      break;
+    }
+    line = view.state.doc.line(line.number + 1);
   }
 }
 
@@ -445,13 +1088,16 @@ function processBareUrlsInRange(
       new RegExp(BARE_URL_REGEX.source, BARE_URL_REGEX.flags)
     )) {
       const index = match.index ?? 0;
+      if (isEscaped(line.text, index)) {
+        continue;
+      }
       const fromPos = line.from + index;
       const toPos = fromPos + match[0].length;
       if (fromPos >= toPos) {
         continue;
       }
       const node = tree.resolveInner(fromPos, 1);
-      if (isInsideLinkContainer(node)) {
+      if (isInsideLinkContainer(node) || shouldSkipInlineDecoration(node)) {
         continue;
       }
       builder.add(fromPos, toPos, linkDecoration);
@@ -466,6 +1112,7 @@ function processBareUrlsInRange(
 
 function processWikiLinksInRange(
   view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
   builder: DecorationBuilder,
   from: number,
   to: number
@@ -474,22 +1121,159 @@ function processWikiLinksInRange(
   const endLine = view.state.doc.lineAt(to);
 
   while (true) {
-    for (const match of line.text.matchAll(
-      new RegExp(WIKI_LINK_REGEX.source, WIKI_LINK_REGEX.flags)
-    )) {
-      const index = match.index ?? 0;
-      const fromPos = line.from + index;
-      const toPos = fromPos + match[0].length;
-      if (fromPos + 2 >= toPos - 2) {
-        continue;
+    if (!isLineWithCursor(view, line.from)) {
+      for (const match of line.text.matchAll(
+        new RegExp(WIKI_LINK_REGEX.source, WIKI_LINK_REGEX.flags)
+      )) {
+        const index = match.index ?? 0;
+        if (index > 0 && line.text[index - 1] === "!") {
+          continue;
+        }
+        if (isEscaped(line.text, index)) {
+          continue;
+        }
+        const fromPos = line.from + index;
+        const toPos = fromPos + match[0].length;
+        if (fromPos + 2 >= toPos - 2) {
+          continue;
+        }
+        const node = tree.resolveInner(fromPos + 2, 1);
+        if (shouldSkipInlineDecoration(node)) {
+          continue;
+        }
+        const parts = parseWikiLinkParts(match[1]);
+        if (!parts) {
+          continue;
+        }
+        const pipeIndex = match[1].indexOf("|");
+        if (pipeIndex !== -1) {
+          const aliasStart = fromPos + 2 + pipeIndex + 1;
+          if (aliasStart < toPos - 2) {
+            builder.add(fromPos, aliasStart, hiddenMarkerDecoration);
+            builder.add(aliasStart, toPos - 2, linkDecoration);
+            builder.add(toPos - 2, toPos, hiddenMarkerDecoration);
+          }
+        } else {
+          builder.add(fromPos, fromPos + 2, hiddenMarkerDecoration);
+          builder.add(fromPos + 2, toPos - 2, linkDecoration);
+          builder.add(toPos - 2, toPos, hiddenMarkerDecoration);
+        }
       }
-      builder.add(fromPos + 2, toPos - 2, linkDecoration);
     }
 
     if (line.number === endLine.number) {
       break;
     }
     line = view.state.doc.line(line.number + 1);
+  }
+}
+
+function processMathBlocks(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder
+) {
+  const doc = view.state.doc;
+  let inBlock = false;
+
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const lineText = line.text;
+    const node = tree.resolveInner(line.from, 1);
+    if (shouldSkipInlineDecoration(node)) {
+      continue;
+    }
+
+    const markerIndex = lineText.indexOf(MATH_BLOCK_DELIMITER);
+    const hasMarker =
+      lineText.trim() === MATH_BLOCK_DELIMITER &&
+      markerIndex !== -1 &&
+      !isEscaped(lineText, markerIndex);
+    const hasCursor = isLineWithCursor(view, line.from);
+
+    if (hasMarker) {
+      if (!hasCursor) {
+        builder.add(line.from, line.to, hiddenMarkerDecoration);
+      }
+      inBlock = !inBlock;
+      continue;
+    }
+
+    if (inBlock && !hasCursor) {
+      builder.addLine(line.from, mathBlockLineDecoration);
+    }
+  }
+}
+
+function processComments(
+  view: EditorView,
+  tree: ReturnType<typeof syntaxTree>,
+  builder: DecorationBuilder
+) {
+  const doc = view.state.doc;
+  let inBlock = false;
+
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const lineText = line.text;
+    const node = tree.resolveInner(line.from, 1);
+    if (shouldSkipInlineDecoration(node)) {
+      continue;
+    }
+
+    const hasCursor = isLineWithCursor(view, line.from);
+    let index = 0;
+    let closedInLine = false;
+
+    while (index < lineText.length) {
+      const markerIndex = lineText.indexOf(COMMENT_MARKER, index);
+      if (markerIndex === -1) {
+        break;
+      }
+      if (isEscaped(lineText, markerIndex)) {
+        index = markerIndex + COMMENT_MARKER.length;
+        continue;
+      }
+
+      if (!inBlock) {
+        const closingIndex = lineText.indexOf(
+          COMMENT_MARKER,
+          markerIndex + COMMENT_MARKER.length
+        );
+        if (closingIndex !== -1 && !isEscaped(lineText, closingIndex)) {
+          if (!hasCursor) {
+            builder.add(
+              line.from + markerIndex,
+              line.from + closingIndex + COMMENT_MARKER.length,
+              hiddenMarkerDecoration
+            );
+          }
+          index = closingIndex + COMMENT_MARKER.length;
+          continue;
+        }
+
+        inBlock = true;
+        if (!hasCursor) {
+          builder.add(line.from + markerIndex, line.to, hiddenMarkerDecoration);
+        }
+        break;
+      }
+
+      if (!hasCursor) {
+        builder.add(
+          line.from,
+          line.from + markerIndex + COMMENT_MARKER.length,
+          hiddenMarkerDecoration
+        );
+      }
+      inBlock = false;
+      closedInLine = true;
+      index = markerIndex + COMMENT_MARKER.length;
+    }
+
+    if (inBlock && !closedInLine && !hasCursor) {
+      builder.add(line.from, line.to, hiddenMarkerDecoration);
+    }
   }
 }
 
@@ -518,6 +1302,9 @@ class LivePreviewPlugin {
           decorations.push({ from, to, deco });
         }
       },
+      addLine: (pos, deco) => {
+        decorations.push({ from: pos, to: pos, deco });
+      },
       addWidget: (pos, widget, side = 1) => {
         widgets.push({ pos, widget, side });
       },
@@ -542,6 +1329,12 @@ class LivePreviewPlugin {
             case "InlineCode":
               processInlineCode(node, view, builder);
               break;
+            case "Subscript":
+              processSubSuper(node, view, builder, subscriptDecoration);
+              break;
+            case "Superscript":
+              processSubSuper(node, view, builder, superscriptDecoration);
+              break;
             case "Link":
               processLink(node, view, builder);
               break;
@@ -554,6 +1347,9 @@ class LivePreviewPlugin {
               break;
             case "Strikethrough":
               processStrikethrough(node, view, builder);
+              break;
+            case "HorizontalRule":
+              processHorizontalRule(node, view, builder);
               break;
             case "ATXHeading1":
               processHeading(node, view, builder, 1);
@@ -573,8 +1369,21 @@ class LivePreviewPlugin {
             case "ATXHeading6":
               processHeading(node, view, builder, 6);
               break;
+            case "SetextHeading1":
+              processSetextHeading(node, view, builder, 1);
+              break;
+            case "SetextHeading2":
+              processSetextHeading(node, view, builder, 2);
+              break;
             case "Blockquote":
               processBlockquote(node, view, builder);
+              break;
+            case "FencedCode":
+            case "CodeBlock":
+              processCodeBlock(node, view, builder);
+              break;
+            case "Table":
+              processTable(node, view, builder);
               break;
             case "ListItem":
               processListItem(node, view, builder);
@@ -582,12 +1391,18 @@ class LivePreviewPlugin {
           }
         },
       });
+      processWikiEmbedsInRange(view, tree, builder, from, to);
       processBareUrlsInRange(view, tree, builder, from, to);
-      processWikiLinksInRange(view, builder, from, to);
+      processWikiLinksInRange(view, tree, builder, from, to);
+      processHighlightsInRange(view, tree, builder, from, to);
+      processInlineMathInRange(view, tree, builder, from, to);
+      processFootnotesInRange(view, tree, builder, from, to);
     }
 
     // Process task lists (checkboxes) - not part of syntax tree iteration
-    processTaskList(view, builder);
+    processTaskList(view, tree, builder);
+    processMathBlocks(view, tree, builder);
+    processComments(view, tree, builder);
 
     // Combine mark decorations and widget decorations
     const allDecorations: { from: number; to: number; value: Decoration }[] = [];
@@ -666,6 +1481,39 @@ export const livePreviewTheme = EditorView.baseTheme({
     opacity: "0.7",
   },
 
+  // Highlight
+  ".cm-md-highlight": {
+    backgroundColor: "hsl(var(--accent) / 0.35)",
+    borderRadius: "0.2rem",
+    padding: "0 0.1rem",
+  },
+
+  // Subscript & superscript
+  ".cm-md-subscript": {
+    fontSize: "0.8em",
+    verticalAlign: "sub",
+  },
+  ".cm-md-superscript": {
+    fontSize: "0.8em",
+    verticalAlign: "super",
+  },
+
+  // Footnotes
+  ".cm-md-footnote": {
+    fontSize: "0.75em",
+    verticalAlign: "super",
+    color: "hsl(var(--primary))",
+  },
+
+  // Math
+  ".cm-md-math": {
+    fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+    backgroundColor: "hsl(var(--muted))",
+    padding: "0.125rem 0.25rem",
+    borderRadius: "0.25rem",
+    fontSize: "0.9em",
+  },
+
   // Headings
   ".cm-md-heading": {
     fontWeight: "700",
@@ -698,10 +1546,41 @@ export const livePreviewTheme = EditorView.baseTheme({
     color: "hsl(var(--muted-foreground))",
   },
 
+  // Callouts
+  ".cm-md-callout-line": {
+    backgroundColor: "hsl(var(--muted) / 0.35)",
+    borderLeft: "4px solid hsl(var(--primary))",
+    paddingLeft: "0.75rem",
+  },
+  ".cm-md-callout-title": {
+    display: "block",
+    fontWeight: "600",
+    fontSize: "0.85em",
+    color: "hsl(var(--primary))",
+    margin: "0.35rem 0 0.15rem",
+  },
+  ".cm-md-callout-line .cm-md-quote": {
+    borderLeft: "none",
+    paddingLeft: "0",
+    fontStyle: "normal",
+    color: "hsl(var(--foreground))",
+  },
+
   // List marker
   ".cm-md-list-marker": {
     color: "hsl(var(--primary))",
     fontWeight: "600",
+  },
+  ".cm-md-list-bullet": {
+    display: "inline-block",
+    minWidth: "1.5rem",
+    textAlign: "right",
+    marginRight: "0.5rem",
+    color: "hsl(var(--primary))",
+    fontWeight: "600",
+  },
+  ".cm-md-list-bullet-unordered": {
+    textAlign: "center",
   },
 
   // Checkbox
@@ -719,6 +1598,40 @@ export const livePreviewTheme = EditorView.baseTheme({
     textDecoration: "line-through",
     opacity: "0.6",
     color: "hsl(var(--muted-foreground))",
+  },
+
+  // Code blocks
+  ".cm-md-code-block": {
+    fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+  },
+  ".cm-md-code-block-line": {
+    backgroundColor: "hsl(var(--muted) / 0.4)",
+    borderRadius: "0.25rem",
+    padding: "0 0.5rem",
+  },
+
+  // Tables
+  ".cm-md-table": {
+    fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+  },
+  ".cm-md-table-line": {
+    backgroundColor: "hsl(var(--muted) / 0.25)",
+    padding: "0 0.35rem",
+  },
+
+  // Math blocks
+  ".cm-md-math-block-line": {
+    backgroundColor: "hsl(var(--muted) / 0.3)",
+    padding: "0.25rem 0.5rem",
+    textAlign: "center",
+    fontFamily: "ui-serif, Georgia, serif",
+  },
+
+  // Horizontal rule
+  ".cm-md-hr": {
+    border: "none",
+    borderTop: "1px solid hsl(var(--border))",
+    margin: "0.75rem 0",
   },
 
   ".cm-md-image": {
