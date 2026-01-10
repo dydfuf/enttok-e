@@ -16,9 +16,10 @@ import type {
   ElectronAPI,
 } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
-import { ActivityStream, type ActivityItemData } from "@/components/activity";
+import { ActivityStream, getActivitySourceLabel } from "@/components/activity";
 import { useEditorOptional } from "@/contexts/EditorContext";
 import { useActivityStream } from "@/hooks/useActivityStream";
+import type { ActivityStreamItem } from "@/lib/activity-types";
 
 export type ChatRole = "user" | "assistant";
 
@@ -46,11 +47,12 @@ function truncateText(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + "...";
 }
 
-function formatActivitiesAsContext(activities: ActivityItemData[]): string {
+function formatActivitiesAsContext(activities: ActivityStreamItem[]): string {
   if (activities.length === 0) return "";
 
   const lines = activities.map((activity) => {
-    return `- [${activity.sourceLabel}] ${activity.title} (${activity.time})\n  ${activity.description}`;
+    const sourceLabel = getActivitySourceLabel(activity.source);
+    return `- [${sourceLabel}] ${activity.title} (${activity.timeLabel})\n  ${activity.description}`;
   });
 
   return lines.join("\n");

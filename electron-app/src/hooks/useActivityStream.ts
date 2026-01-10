@@ -6,15 +6,19 @@ import { useActivityEvents } from "@/hooks/useActivityEvents";
 import { useCalendar } from "@/hooks/useCalendar";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import type { CalendarEvent } from "@/lib/calendar-api";
-import type { ActivityItemData } from "@/components/activity";
+import {
+	normalizeActivitySource,
+	type ActivityStreamEntry,
+	type ActivityStreamItem,
+} from "@/lib/activity-types";
 
 const ACTIVITY_WINDOW_HOURS = 24;
 const MAX_ACTIVITY_ITEMS = 50;
 
-type ActivityEntry = ActivityItemData & { timestamp: number };
+type ActivityEntryInput = Omit<ActivityStreamEntry, "timeLabel">;
 
 type ActivityStreamState = {
-	activities: ActivityItemData[];
+	activities: ActivityStreamItem[];
 	isLoading: boolean;
 	error: string | null;
 	refresh: () => Promise<void>;
@@ -31,6 +35,15 @@ function formatRelativeTime(timestamp: number): string {
 		return "unknown";
 	}
 	return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+}
+
+function buildActivityEntry(
+	input: ActivityEntryInput,
+): ActivityStreamEntry {
+	return {
+		...input,
+		timeLabel: formatRelativeTime(input.timestamp),
+	};
 }
 
 function formatCalendarDetails(event: CalendarEvent): string {
@@ -126,40 +139,38 @@ export function useActivityStream(): ActivityStreamState {
 		]);
 	}, [refreshGitHub, refreshSummary, reloadActivity, reloadCalendar, refreshClaudeSessions]);
 
-	const calendarEntries = useMemo<ActivityEntry[]>(() => {
+	const calendarEntries = useMemo<ActivityStreamEntry[]>(() => {
 		return events
 			.map((event) => {
 				const timestamp = toTimestamp(event.start_time);
 				if (!timestamp) return null;
 
-				return {
+				return buildActivityEntry({
 					id: `calendar:${event.calendar_id}:${event.event_id}`,
 					title: event.title || "Untitled event",
 					description: formatCalendarDetails(event),
 					source: "calendar",
-					sourceLabel: "Calendar",
-					time: formatRelativeTime(timestamp),
 					timestamp,
-				};
+				});
 			})
-			.filter((entry): entry is ActivityEntry => Boolean(entry));
+			.filter((entry): entry is ActivityStreamEntry => Boolean(entry));
 	}, [events]);
 
-	const gitHubEntries = useMemo<ActivityEntry[]>(() => {
+	const gitHubEntries = useMemo<ActivityStreamEntry[]>(() => {
 		if (!summary) return [];
 
-		const entries: ActivityEntry[] = [];
+		const entries: ActivityStreamEntry[] = [];
 		const seen = new Set<string>();
 		const rangeStartMs = rangeStart.getTime();
 		const rangeEndMs = rangeEnd.getTime();
 
-		const pushEntry = (entry: ActivityEntry) => {
+		const pushEntry = (entry: ActivityEntryInput) => {
 			if (entry.timestamp < rangeStartMs || entry.timestamp > rangeEndMs) {
 				return;
 			}
 			if (seen.has(entry.id)) return;
 			seen.add(entry.id);
-			entries.push(entry);
+			entries.push(buildActivityEntry(entry));
 		};
 
 		for (const pr of summary.prs.authored) {
@@ -171,8 +182,6 @@ export function useActivityStream(): ActivityStreamState {
 				title: `PR #${pr.number}: ${pr.title}`,
 				description: `Authored (${stateLabel}) in ${pr.repository}`,
 				source: "github",
-				sourceLabel: "GitHub",
-				time: formatRelativeTime(timestamp),
 				timestamp,
 			});
 		}
@@ -186,8 +195,6 @@ export function useActivityStream(): ActivityStreamState {
 				title: `PR #${pr.number}: ${pr.title}`,
 				description: `Reviewed (${stateLabel}) in ${pr.repository}`,
 				source: "github",
-				sourceLabel: "GitHub",
-				time: formatRelativeTime(timestamp),
 				timestamp,
 			});
 		}
@@ -200,8 +207,6 @@ export function useActivityStream(): ActivityStreamState {
 				title: commit.message,
 				description: `${commit.repository} (${commit.sha})`,
 				source: "github",
-				sourceLabel: "GitHub",
-				time: formatRelativeTime(timestamp),
 				timestamp,
 			});
 		}
@@ -209,12 +214,7 @@ export function useActivityStream(): ActivityStreamState {
 		return entries;
 	}, [summary, rangeEnd, rangeStart]);
 
-	const atlassianEntries = useMemo<ActivityEntry[]>(() => {
-		const sourceLabels: Record<string, string> = {
-			jira: "Jira",
-			confluence: "Confluence",
-		};
-
+	const atlassianEntries = useMemo<ActivityStreamEntry[]>(() => {
 		return activityEvents
 			.map((event) => {
 				const timestamp = toTimestamp(event.event_time);
@@ -228,23 +228,21 @@ export function useActivityStream(): ActivityStreamState {
 				}
 				const description = descriptionParts.join(" | ") || "Activity";
 
-				return {
+				return buildActivityEntry({
 					id: `atlassian:${event.source}:${event.id}`,
-					title: event.title,
+					title: event.title || "Untitled activity",
 					description,
-					source: event.source as ActivityItemData["source"],
-					sourceLabel: sourceLabels[event.source] || "Atlassian",
-					time: formatRelativeTime(timestamp),
+					source: normalizeActivitySource(event.source),
 					timestamp,
-				};
+				});
 			})
-			.filter((entry): entry is ActivityEntry => Boolean(entry));
+			.filter((entry): entry is ActivityStreamEntry => Boolean(entry));
 	}, [activityEvents]);
 
-	const claudeEntries = useMemo<ActivityEntry[]>(() => {
+	const claudeEntries = useMemo<ActivityStreamEntry[]>(() => {
 		const rangeStartMs = rangeStart.getTime();
 		const rangeEndMs = rangeEnd.getTime();
-		const entries: ActivityEntry[] = [];
+		const entries: ActivityStreamEntry[] = [];
 
 		for (const session of claudeSessions) {
 			const timestamp = toTimestamp(session.timestamp);
@@ -257,21 +255,19 @@ export function useActivityStream(): ActivityStreamState {
 				? session.firstMessage.slice(0, 100) + (session.firstMessage.length > 100 ? "..." : "")
 				: `${session.messageCount} messages`;
 
-			entries.push({
+			entries.push(buildActivityEntry({
 				id: `claude:session:${session.id}`,
 				title: session.summary || "Claude Session",
 				description,
 				source: "claude",
-				sourceLabel: "Claude Code",
-				time: formatRelativeTime(timestamp),
 				timestamp,
-			});
+			}));
 		}
 
 		return entries;
 	}, [claudeSessions, rangeStart, rangeEnd]);
 
-	const activities = useMemo<ActivityItemData[]>(() => {
+	const activities = useMemo<ActivityStreamItem[]>(() => {
 		const entries = [...calendarEntries, ...gitHubEntries, ...atlassianEntries, ...claudeEntries];
 		entries.sort((a, b) => b.timestamp - a.timestamp);
 		return entries.slice(0, MAX_ACTIVITY_ITEMS).map(({ timestamp, ...rest }) => rest);

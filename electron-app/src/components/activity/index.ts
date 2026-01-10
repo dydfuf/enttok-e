@@ -1,2 +1,4 @@
 export { ActivityStream } from "./ActivityStream";
-export { ActivityItem, type ActivityItemData, type ActivitySource } from "./ActivityItem";
+export { ActivityItem } from "./ActivityItem";
+export { getActivitySourceLabel } from "./activity-config";
+export type { ActivitySource, ActivityStreamItem } from "@/lib/activity-types";
