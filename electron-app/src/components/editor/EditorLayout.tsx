@@ -9,6 +9,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorActivityHeader } from "@/components/activity";
 import { cn } from "@/lib/utils";
 import { useEditorOptional } from "@/contexts/EditorContext";
+import { getElectronAPI } from "@/lib/electron";
 import type { ActivityStreamItem } from "@/lib/activity-types";
 
 interface EditorLayoutProps {
@@ -46,6 +47,16 @@ export function EditorLayout({
   const contentRef = useRef(content);
   const filePathRef = useRef(filePath);
   const editorContext = useEditorOptional();
+  const summarizePromptRef = useRef<string | null>(null);
+
+  // Load summarize prompt from settings
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api) return;
+    api.getSummarizePrompt().then((prompt) => {
+      summarizePromptRef.current = prompt;
+    }).catch(() => undefined);
+  }, []);
 
   // Parse selected date from URL (e.g., /daily/2024-01-12)
   const selectedDate = useMemo(() => {
@@ -72,6 +83,21 @@ export function EditorLayout({
   }, [activities]);
 
   const handleSummarize = useCallback(() => {
+    const defaultPrompt = `오늘 한 일을 요약해줘.
+
+## 링크 규칙
+- Jira, Confluence(Wiki) 항목: 반드시 마크다운 링크로 작성 (예: [제목](URL))
+- GitHub PR (본인이 생성한 것): 마크다운 링크로 작성
+- GitHub 커밋, 리뷰: 링크 없이 텍스트로만 작성
+- Claude 세션: 링크 없이 텍스트로만 작성
+
+## 출력 형식
+- 간결하고 명확하게 작성
+- 주요 작업을 카테고리별로 그룹핑
+- 각 항목은 불릿 포인트로 작성`;
+
+    const prompt = summarizePromptRef.current || defaultPrompt;
+
     window.dispatchEvent(
       new CustomEvent<{
         activities: ActivityStreamItem[];
@@ -81,7 +107,7 @@ export function EditorLayout({
         detail: {
           activities,
           noteContent: contentRef.current,
-          prompt: "오늘 한 일 요약해줘",
+          prompt,
         },
       })
     );

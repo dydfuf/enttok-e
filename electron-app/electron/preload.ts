@@ -77,6 +77,12 @@ const api: ElectronAPI = {
   getAssetsFolder: () => ipcRenderer.invoke("store:get-assets-folder"),
   setAssetsFolder: (folder: string) =>
     ipcRenderer.invoke("store:set-assets-folder", folder),
+  getSummarizePrompt: () =>
+    ipcRenderer.invoke("store:get-summarize-prompt") as Promise<string>,
+  setSummarizePrompt: (prompt: string) =>
+    ipcRenderer.invoke("store:set-summarize-prompt", prompt) as Promise<{ success: boolean }>,
+  resetSummarizePrompt: () =>
+    ipcRenderer.invoke("store:reset-summarize-prompt") as Promise<{ success: boolean; prompt: string }>,
 
   // Backend API
   startBackend: () => ipcRenderer.invoke("backend:start"),

@@ -65,7 +65,8 @@ function formatActivitiesAsContext(activities: ActivityStreamItem[]): string {
 
   const lines = activities.map((activity) => {
     const sourceLabel = getActivitySourceLabel(activity.source);
-    return `- [${sourceLabel}] ${activity.title} (${activity.timeLabel})\n  ${activity.description}`;
+    const urlPart = activity.url ? `\n  URL: ${activity.url}` : "";
+    return `- [${sourceLabel}] ${activity.title} (${activity.timeLabel})\n  ${activity.description}${urlPart}`;
   });
 
   return lines.join("\n");

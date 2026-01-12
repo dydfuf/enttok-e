@@ -123,6 +123,8 @@ function SettingsPage() {
 	const [dailyTemplateInput, setDailyTemplateInput] = useState(
 		DEFAULT_DAILY_NOTE_TEMPLATE,
 	);
+	const [summarizePrompt, setSummarizePrompt] = useState("");
+	const [summarizePromptInput, setSummarizePromptInput] = useState("");
 	const [notificationSettings, setNotificationSettings] =
 		useState<WorkTimeNotificationSettings>({
 			enabled: false,
@@ -151,6 +153,7 @@ function SettingsPage() {
 	const assetsFolderDirty =
 		assetsFolderValidation.normalized !== assetsFolder;
 	const dailyTemplateDirty = dailyTemplateInput !== dailyTemplate;
+	const summarizePromptDirty = summarizePromptInput !== summarizePrompt;
 	const status = state?.status ?? "stopped";
 	const statusLabel = STATUS_LABELS[status] ?? status;
 	const statusClass = STATUS_CLASSES[status] ?? STATUS_CLASSES.stopped;
@@ -270,6 +273,27 @@ function SettingsPage() {
 		}
 		let mounted = true;
 		api
+			.getSummarizePrompt()
+			.then((value) => {
+				if (!mounted) {
+					return;
+				}
+				setSummarizePrompt(value);
+				setSummarizePromptInput(value);
+			})
+			.catch(() => undefined);
+		return () => {
+			mounted = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		let mounted = true;
+		api
 			.getWorkTimeNotifications()
 			.then((value) => {
 				if (!mounted) {
@@ -335,6 +359,35 @@ function SettingsPage() {
 			toast.success("Template saved successfully!");
 		} catch {
 			toast.error("Failed to save template");
+		}
+	};
+
+	const handleSaveSummarizePrompt = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		try {
+			await api.setSummarizePrompt(summarizePromptInput);
+			setSummarizePrompt(summarizePromptInput);
+			toast.success("Summarize prompt saved!");
+		} catch {
+			toast.error("Failed to save summarize prompt");
+		}
+	};
+
+	const handleResetSummarizePrompt = async () => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		try {
+			const result = await api.resetSummarizePrompt();
+			setSummarizePrompt(result.prompt);
+			setSummarizePromptInput(result.prompt);
+			toast.success("Summarize prompt reset to default!");
+		} catch {
+			toast.error("Failed to reset summarize prompt");
 		}
 	};
 
@@ -787,27 +840,60 @@ function SettingsPage() {
 					</TabsContent>
 
 					<TabsContent value="templates">
-						<Card>
-							<CardHeader>
-								<CardTitle>Daily Note Template</CardTitle>
-								<CardDescription>
-									Customize the template for new daily notes
-								</CardDescription>
-							</CardHeader>
-							<CardContent className="space-y-3">
-								<Textarea
-									className="font-mono min-h-[150px]"
-									value={dailyTemplateInput}
-									onChange={(e) => setDailyTemplateInput(e.target.value)}
-								/>
-								<Button
-									onClick={handleSaveTemplate}
-									disabled={!dailyTemplateDirty}
-								>
-									Save Template
-								</Button>
-							</CardContent>
-						</Card>
+						<div className="space-y-6">
+							<Card>
+								<CardHeader>
+									<CardTitle>Daily Note Template</CardTitle>
+									<CardDescription>
+										Customize the template for new daily notes
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-3">
+									<Textarea
+										className="font-mono min-h-[150px]"
+										value={dailyTemplateInput}
+										onChange={(e) => setDailyTemplateInput(e.target.value)}
+									/>
+									<Button
+										onClick={handleSaveTemplate}
+										disabled={!dailyTemplateDirty}
+									>
+										Save Template
+									</Button>
+								</CardContent>
+							</Card>
+
+							<Card>
+								<CardHeader>
+									<CardTitle>Summarize Prompt</CardTitle>
+									<CardDescription>
+										Customize the prompt used for "오늘 한 일 요약" feature
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-3">
+									<Textarea
+										className="font-mono min-h-[200px]"
+										value={summarizePromptInput}
+										onChange={(e) => setSummarizePromptInput(e.target.value)}
+										placeholder="Enter your summarize prompt..."
+									/>
+									<div className="flex gap-2">
+										<Button
+											onClick={handleSaveSummarizePrompt}
+											disabled={!summarizePromptDirty}
+										>
+											Save Prompt
+										</Button>
+										<Button
+											variant="outline"
+											onClick={handleResetSummarizePrompt}
+										>
+											Reset to Default
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+						</div>
 					</TabsContent>
 
 					<TabsContent value="system">

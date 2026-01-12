@@ -33,6 +33,10 @@ import {
   setWorkTimeNotifications,
   getClaudeProjectPaths,
   setClaudeProjectPaths,
+  getSummarizePrompt,
+  setSummarizePrompt,
+  resetSummarizePrompt,
+  DEFAULT_SUMMARIZE_PROMPT,
   type WorkTimeNotificationSettings,
 } from "../store.js";
 import {
@@ -158,6 +162,17 @@ export function registerIpcHandlers() {
   ipcMain.handle("store:set-assets-folder", (_, folder: string) => {
     setAssetsFolder(folder);
     return { success: true };
+  });
+
+  // Summarize prompt handlers
+  ipcMain.handle("store:get-summarize-prompt", () => getSummarizePrompt());
+  ipcMain.handle("store:set-summarize-prompt", (_, prompt: string) => {
+    setSummarizePrompt(prompt);
+    return { success: true };
+  });
+  ipcMain.handle("store:reset-summarize-prompt", () => {
+    resetSummarizePrompt();
+    return { success: true, prompt: DEFAULT_SUMMARIZE_PROMPT };
   });
 
   ipcMain.handle("github:get-repo-paths", () => getGitHubRepoPaths());

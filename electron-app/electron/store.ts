@@ -27,6 +27,7 @@ interface StoreSchema {
   workTimeNotifications: WorkTimeNotificationSettings;
   claudeProjectPaths: string[];
   claudeProjectPath?: string | null;
+  summarizePrompt: string;
 }
 
 const DEFAULT_DAILY_NOTE_TEMPLATE = `---
@@ -46,6 +47,19 @@ tags: [daily]
 
 ## Notes
 `;
+
+const DEFAULT_SUMMARIZE_PROMPT = `오늘 한 일을 요약해줘.
+
+## 링크 규칙
+- Jira, Confluence(Wiki) 항목: 반드시 마크다운 링크로 작성 (예: [제목](URL))
+- GitHub PR (본인이 생성한 것): 마크다운 링크로 작성
+- GitHub 커밋, 리뷰: 링크 없이 텍스트로만 작성
+- Claude 세션: 링크 없이 텍스트로만 작성
+
+## 출력 형식
+- 간결하고 명확하게 작성
+- 주요 작업을 카테고리별로 그룹핑
+- 각 항목은 불릿 포인트로 작성`;
 
 const store = new Store<StoreSchema>({
   name: "enttok-config",
@@ -67,6 +81,7 @@ const store = new Store<StoreSchema>({
     },
     claudeProjectPaths: [],
     claudeProjectPath: null,
+    summarizePrompt: DEFAULT_SUMMARIZE_PROMPT,
   },
 });
 
@@ -207,3 +222,17 @@ export function setClaudeProjectPaths(paths: string[]): void {
   store.set("claudeProjectPaths", normalized);
   store.set("claudeProjectPath", normalized.length === 1 ? normalized[0] : null);
 }
+
+export function getSummarizePrompt(): string {
+  return store.get("summarizePrompt");
+}
+
+export function setSummarizePrompt(prompt: string): void {
+  store.set("summarizePrompt", prompt);
+}
+
+export function resetSummarizePrompt(): void {
+  store.set("summarizePrompt", DEFAULT_SUMMARIZE_PROMPT);
+}
+
+export { DEFAULT_SUMMARIZE_PROMPT };

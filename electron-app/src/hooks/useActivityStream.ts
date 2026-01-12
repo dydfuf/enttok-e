@@ -197,6 +197,7 @@ export function useActivityStream(options: UseActivityStreamOptions = {}): Activ
 				description: `Authored (${stateLabel}) in ${pr.repository}`,
 				source: "github",
 				timestamp,
+				url: pr.url,
 			});
 		}
 
@@ -210,6 +211,7 @@ export function useActivityStream(options: UseActivityStreamOptions = {}): Activ
 				description: `Reviewed (${stateLabel}) in ${pr.repository}`,
 				source: "github",
 				timestamp,
+				// No URL for reviews - per user requirement
 			});
 		}
 
@@ -222,6 +224,7 @@ export function useActivityStream(options: UseActivityStreamOptions = {}): Activ
 				description: `${commit.repository} (${commit.sha})`,
 				source: "github",
 				timestamp,
+				// No URL for commits - per user requirement
 			});
 		}
 
@@ -248,6 +251,7 @@ export function useActivityStream(options: UseActivityStreamOptions = {}): Activ
 					description,
 					source: normalizeActivitySource(event.source),
 					timestamp,
+					url: event.url ?? undefined,
 				});
 			})
 			.filter((entry): entry is ActivityStreamEntry => Boolean(entry));

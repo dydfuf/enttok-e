@@ -17,6 +17,7 @@ export type ActivityStreamItem = {
 	description: string;
 	source: ActivitySource;
 	timeLabel: string;
+	url?: string;
 };
 
 export type ActivityStreamEntry = ActivityStreamItem & {
