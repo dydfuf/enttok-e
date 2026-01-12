@@ -8,6 +8,7 @@ from app.services.calendar import run_calendar_sync_job
 from app.services.claude import run_claude_job
 from app.services.confluence import run_confluence_sync_job
 from app.services.jira import run_jira_sync_job
+from app.services.memory import run_memory_process_job, run_chroma_sync_job
 from app.websocket.manager import manager
 
 job_queue: asyncio.Queue[str] = asyncio.Queue()
@@ -43,6 +44,14 @@ async def process_job(job_id: str) -> None:
         return
     if job["type"] == "connector.confluence.sync":
         await run_confluence_sync_job(job_id, job.get("payload", {}))
+        return
+
+    # Memory system jobs
+    if job["type"] == "memory.process_events":
+        await run_memory_process_job(job_id, job.get("payload", {}))
+        return
+    if job["type"] == "memory.chroma_sync":
+        await run_chroma_sync_job(job_id, job.get("payload", {}))
         return
 
     await jobs_repo.update_job(job_id, status="running", progress=0.0)

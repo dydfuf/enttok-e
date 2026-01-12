@@ -11,3 +11,6 @@
 **/*.pyc
 
 .env
+
+# Backend data (SQLite, ChromaDB)
+backend/data/

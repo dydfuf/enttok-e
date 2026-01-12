@@ -10,6 +10,11 @@ import type {
   GitHubStatus,
   RuntimeStatus,
   WorkTimeNotificationSettings,
+  McpState,
+  McpConnectionInfo,
+  MemoryStats,
+  MemorySearchResult,
+  ObservationSummary,
 } from "../src/shared/electron-api";
 
 // Electron API를 렌더러 프로세스에 노출
@@ -155,6 +160,47 @@ const api: ElectronAPI = {
     >,
   setClaudeProjectPaths: (projectPaths: string[]) =>
     ipcRenderer.invoke("claude-sessions:set-project-paths", projectPaths),
+
+  // MCP Server API
+  startMcp: () => ipcRenderer.invoke("mcp:start") as Promise<McpState>,
+  stopMcp: () => ipcRenderer.invoke("mcp:stop") as Promise<McpState>,
+  getMcpStatus: () => ipcRenderer.invoke("mcp:status") as Promise<McpState>,
+  getMcpConnectionInfo: () =>
+    ipcRenderer.invoke("mcp:connection-info") as Promise<McpConnectionInfo>,
+  onMcpStatus: (handler: (payload: McpState) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: McpState) =>
+      handler(payload);
+    ipcRenderer.on("mcp:status", listener);
+    return () => {
+      ipcRenderer.removeListener("mcp:status", listener);
+    };
+  },
+  onMcpLog: (handler: (payload: BackendLog) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, payload: BackendLog) =>
+      handler(payload);
+    ipcRenderer.on("mcp:log", listener);
+    return () => {
+      ipcRenderer.removeListener("mcp:log", listener);
+    };
+  },
+
+  // Memory System API
+  getMemoryStats: () =>
+    ipcRenderer.invoke("memory:stats") as Promise<MemoryStats>,
+  searchMemory: (payload: { query: string; limit?: number; type?: string }) =>
+    ipcRenderer.invoke("memory:search", payload) as Promise<MemorySearchResult>,
+  getObservations: (params?: { days_back?: number }) =>
+    ipcRenderer.invoke("memory:observations", params) as Promise<
+      ObservationSummary[]
+    >,
+  triggerMemorySync: () => ipcRenderer.invoke("memory:sync-trigger"),
+  triggerChromaSync: () => ipcRenderer.invoke("memory:chroma-sync"),
+  syncGitHubToMemory: (payload: {
+    prs: { authored: unknown[]; reviewed: unknown[] };
+    commits: unknown[];
+  }) => ipcRenderer.invoke("memory:sync-github", payload),
+  syncClaudeSessionsToMemory: (payload: { sessions: unknown[] }) =>
+    ipcRenderer.invoke("memory:sync-claude-sessions", payload),
 };
 
 contextBridge.exposeInMainWorld("electronAPI", api);

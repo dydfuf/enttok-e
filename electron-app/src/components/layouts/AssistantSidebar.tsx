@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { parseISO } from "date-fns";
-import { Activity, Bot, FileText, History, Loader2, Plus, X } from "lucide-react";
+import { Activity, Bot, BookOpen, ChevronDown, ChevronRight, FileText, History, Loader2, Plus, X } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,7 @@ import type {
   ClaudeJobResponse,
   ClaudeSessionResponse,
   ElectronAPI,
+  MemorySearchResult,
 } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
 import { ActivityStream, getActivitySourceLabel } from "@/components/activity";
@@ -25,6 +26,17 @@ import type { ActivityStreamItem } from "@/lib/activity-types";
 
 export type ChatRole = "user" | "assistant";
 
+// Memory reference from hybrid search
+export interface MemoryReference {
+  observation_id: string;
+  title: string;
+  snippet: string;
+  type: string;
+  source: string;
+  event_time: string;
+  score: number;
+}
+
 // Designed for future history persistence via backend sessions API
 export interface ChatMessage {
   id: string;
@@ -33,16 +45,18 @@ export interface ChatMessage {
   timestamp: string;
   status?: "pending" | "streaming" | "complete" | "error";
   error?: string | null;
+  memoryReferences?: MemoryReference[];
 }
 
 type ClaudeAPI = Pick<
   ElectronAPI,
-  "spawnClaude" | "createClaudeSession" | "getJob"
+  "spawnClaude" | "createClaudeSession" | "getJob" | "searchMemory"
 >;
 
 const MAX_SELECTION_CHARS = 2000;
 const MAX_NOTE_CONTEXT_CHARS = 4000;
 const MAX_ACTIVITY_CONTEXT_CHARS = 4000;
+const MAX_MEMORY_RESULTS = 100;
 
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
@@ -60,14 +74,30 @@ function formatActivitiesAsContext(activities: ActivityStreamItem[]): string {
   return lines.join("\n");
 }
 
+function formatMemoryAsContext(references: MemoryReference[]): string {
+  if (references.length === 0) return "";
+
+  const lines = references.map((ref, i) => {
+    const sourceLabel = ref.source.replace(/_/g, " ");
+    return `${i + 1}. [${ref.type}/${sourceLabel}] ${ref.title}\n   ${ref.snippet}`;
+  });
+
+  return lines.join("\n\n");
+}
+
 function buildPromptWithContext(
   userPrompt: string,
   selectedText: string | null,
   noteContent: string | null,
   includeNoteContext: boolean,
-  activityContext: string | null
+  activityContext: string | null,
+  memoryContext: string | null
 ): string {
   const parts: string[] = [];
+
+  if (memoryContext) {
+    parts.push(`[Related Memory]\nThe following are relevant observations from your work journal:\n\n${memoryContext}`);
+  }
 
   if (activityContext) {
     const truncated = truncateText(activityContext, MAX_ACTIVITY_CONTEXT_CHARS);
@@ -205,7 +235,23 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
         setActivityContext(null);
       }
 
-      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext, activityCtx);
+      // Search memory for relevant context
+      let memoryReferences: MemoryReference[] = [];
+      let memoryContext: string | null = null;
+      try {
+        const searchResult: MemorySearchResult = await claudeAPI.searchMemory({
+          query: userPrompt,
+          limit: MAX_MEMORY_RESULTS,
+        });
+        if (searchResult.results && searchResult.results.length > 0) {
+          memoryReferences = searchResult.results;
+          memoryContext = formatMemoryAsContext(memoryReferences);
+        }
+      } catch {
+        // Memory search is optional, continue without it
+      }
+
+      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext, activityCtx, memoryContext);
 
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
@@ -222,6 +268,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
         content: "",
         timestamp: new Date().toISOString(),
         status: "pending",
+        memoryReferences: memoryReferences.length > 0 ? memoryReferences : undefined,
       };
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
@@ -591,10 +638,12 @@ interface MessageBubbleProps {
 }
 
 function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
+  const [showReferences, setShowReferences] = useState(false);
   const isUser = message.role === "user";
   const isPending = message.status === "pending";
   const isStreaming = message.status === "streaming";
   const isError = message.status === "error";
+  const hasMemoryReferences = !isUser && message.memoryReferences && message.memoryReferences.length > 0;
 
   return (
     <div className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}>
@@ -625,6 +674,45 @@ function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
           </div>
         )}
       </div>
+
+      {hasMemoryReferences && (
+        <div className="w-full max-w-[90%]">
+          <button
+            type="button"
+            onClick={() => setShowReferences(!showReferences)}
+            className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5"
+          >
+            {showReferences ? (
+              <ChevronDown className="size-3" />
+            ) : (
+              <ChevronRight className="size-3" />
+            )}
+            <BookOpen className="size-3" />
+            <span>{message.memoryReferences!.length} references used</span>
+          </button>
+
+          {showReferences && (
+            <div className="mt-1 space-y-1 pl-1">
+              {message.memoryReferences!.map((ref) => (
+                <div
+                  key={ref.observation_id}
+                  className="text-[10px] p-1.5 rounded bg-background border border-border/50"
+                >
+                  <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                    <span className="px-1 py-0.5 rounded bg-muted text-[9px] font-medium">
+                      {ref.type}
+                    </span>
+                    <span className="text-[9px]">•</span>
+                    <span className="text-[9px]">{ref.source.replace(/_/g, " ")}</span>
+                  </div>
+                  <div className="font-medium text-foreground truncate">{ref.title}</div>
+                  <div className="text-muted-foreground line-clamp-2 mt-0.5">{ref.snippet}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {!isUser && message.status === "complete" && message.content && (
         <div className="flex gap-1 mt-1">

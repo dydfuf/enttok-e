@@ -7,6 +7,7 @@ import net from "net";
 import path from "path";
 import { applyRuntimeEnv, refreshRuntimeStatus } from "./runtime.js";
 import { getBackendBaseDir, getBackendPythonPath } from "../paths.js";
+import { startMcp } from "./mcp.js";
 
 type BackendStatus = "stopped" | "starting" | "running" | "stopping" | "error";
 
@@ -257,6 +258,12 @@ export async function startBackend() {
     }
 
     updateBackendState({ status: "running" });
+
+    // Auto-start MCP server when backend is running
+    startMcp().catch((err) => {
+      emitBackendLog("warn", `MCP auto-start failed: ${err.message}`);
+    });
+
     return backendState;
   })();
 

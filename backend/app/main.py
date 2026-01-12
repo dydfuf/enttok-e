@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 _backend_dir = Path(__file__).resolve().parent.parent
 load_dotenv(_backend_dir / ".env")
 
-from app.api import activity, calendar, claude, confluence, events, health, jira, jobs, status
+from app.api import activity, calendar, claude, confluence, events, health, jira, jobs, memory, status
 from app.core.config import ensure_dirs
 from app.core.logging import configure_logging
 from app.db.connection import close_db, connect_db
@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(jira.router)
     app.include_router(confluence.router)
     app.include_router(activity.router)
+    app.include_router(memory.router)
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:

@@ -230,6 +230,68 @@ export type ClaudeSessionDetailResult = {
   error: string | null;
 };
 
+// MCP Server Types
+export type McpStatus = "stopped" | "starting" | "running" | "stopping" | "error";
+
+export type McpState = {
+  status: McpStatus;
+  pid: number | null;
+  startedAt: number | null;
+  lastExitCode: number | null;
+  lastSignal: string | null;
+  lastError: string | null;
+  serverCommand: string | null;
+  serverArgs: string[] | null;
+  serverCwd: string | null;
+};
+
+export type McpConnectionInfo = {
+  command: string;
+  args: string[];
+  cwd: string;
+  isRunning: boolean;
+};
+
+// Memory System Types
+export type MemoryStats = {
+  total_observations: number;
+  observations_by_type: Record<string, number>;
+  observations_by_source: Record<string, number>;
+  chroma_synced: number;
+  pending_sync: number;
+  chroma_available: boolean;
+  chroma_collection_count: number;
+};
+
+export type ObservationSummary = {
+  observation_id: string;
+  title: string;
+  narrative: string;
+  type: string;
+  source: string;
+  event_time: string;
+  event_ts: number;
+  created_at: string;
+  facts?: string[];
+  concepts?: string[];
+  project_path?: string;
+};
+
+export type MemorySearchResult = {
+  query: string;
+  mode: string;
+  total: number;
+  results: Array<{
+    observation_id: string;
+    title: string;
+    snippet: string;
+    type: string;
+    source: string;
+    event_time: string;
+    score: number;
+  }>;
+};
+
 export type ElectronAPI = {
   send: (channel: string, data: unknown) => void;
   receive: (channel: string, func: (...args: unknown[]) => void) => void;
@@ -298,4 +360,30 @@ export type ElectronAPI = {
   setClaudeProjectPaths: (
     projectPaths: string[]
   ) => Promise<{ success: boolean }>;
+  // MCP Server
+  startMcp: () => Promise<McpState>;
+  stopMcp: () => Promise<McpState>;
+  getMcpStatus: () => Promise<McpState>;
+  getMcpConnectionInfo: () => Promise<McpConnectionInfo>;
+  onMcpStatus: (handler: (payload: McpState) => void) => () => void;
+  onMcpLog: (handler: (payload: BackendLog) => void) => () => void;
+  // Memory System
+  getMemoryStats: () => Promise<MemoryStats>;
+  searchMemory: (payload: {
+    query: string;
+    limit?: number;
+    type?: string;
+  }) => Promise<MemorySearchResult>;
+  getObservations: (params?: {
+    days_back?: number;
+  }) => Promise<ObservationSummary[]>;
+  triggerMemorySync: () => Promise<{ success: boolean }>;
+  triggerChromaSync: () => Promise<{ success: boolean }>;
+  syncGitHubToMemory: (payload: {
+    prs: { authored: GitHubPR[]; reviewed: GitHubPR[] };
+    commits: GitHubCommit[];
+  }) => Promise<{ success: boolean; processed: Record<string, number>; total: number }>;
+  syncClaudeSessionsToMemory: (payload: {
+    sessions: ClaudeSession[];
+  }) => Promise<{ success: boolean; processed: number }>;
 };

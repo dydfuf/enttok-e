@@ -11,6 +11,7 @@ def utc_now() -> str:
 
 
 def parse_iso_to_epoch(value: str) -> int:
+    """Parse ISO timestamp to Unix epoch (seconds)."""
     normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
     if _OFFSET_NO_COLON.search(normalized):
         normalized = _OFFSET_NO_COLON.sub(r"\1\2:\3", normalized)
@@ -20,3 +21,8 @@ def parse_iso_to_epoch(value: str) -> int:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return int(dt.timestamp())
+
+
+def parse_iso_to_ts(value: str) -> int:
+    """Parse ISO timestamp to Unix timestamp (milliseconds)."""
+    return parse_iso_to_epoch(value) * 1000

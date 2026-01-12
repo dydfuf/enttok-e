@@ -182,6 +182,93 @@ def init_db(conn: sqlite3.Connection) -> None:
         on calendar_calendars (account_id, selected);
         """
     )
+
+    # Memory system tables
+    conn.execute(
+        """
+        create table if not exists observations (
+          observation_id text primary key,
+          title text not null,
+          narrative text not null,
+          facts text,
+          concepts text,
+          type text not null,
+          source text not null,
+          source_event_id text,
+          project_path text,
+          event_time text not null,
+          event_ts integer not null,
+          created_at text not null,
+          updated_at text not null,
+          embedding_version text,
+          chroma_synced integer default 0
+        );
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_observations_type
+        on observations (type);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_observations_source
+        on observations (source);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_observations_event_ts
+        on observations (event_ts);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_observations_chroma_synced
+        on observations (chroma_synced);
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_observations_project
+        on observations (project_path);
+        """
+    )
+
+    # FTS5 full-text search virtual table
+    conn.execute(
+        """
+        create virtual table if not exists observations_fts using fts5(
+          observation_id unindexed,
+          title,
+          narrative,
+          facts,
+          concepts,
+          tokenize='unicode61'
+        );
+        """
+    )
+
+    # Track which events have been processed into observations
+    conn.execute(
+        """
+        create table if not exists observation_sources (
+          source_type text not null,
+          source_id text not null,
+          observation_id text not null,
+          created_at text not null,
+          primary key (source_type, source_id)
+        );
+        """
+    )
+    conn.execute(
+        """
+        create index if not exists idx_observation_sources_observation
+        on observation_sources (observation_id);
+        """
+    )
+
     conn.commit()
 
 

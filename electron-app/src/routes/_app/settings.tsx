@@ -22,7 +22,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useVault } from "@/contexts/VaultContext";
 import { useBackend } from "@/contexts/BackendContext";
-import { FolderOpen, LogOut } from "lucide-react";
+import { useGitHub } from "@/contexts/GitHubContext";
+import { useClaudeSessions } from "@/contexts/ClaudeSessionsContext";
+import { FolderOpen, LogOut, Copy, RefreshCw, Database, Server, Github, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
 	DEFAULT_ASSETS_FOLDER,
@@ -35,6 +37,9 @@ import type {
 	RuntimeBinaryStatus,
 	RuntimeStatus,
 	WorkTimeNotificationSettings,
+	McpState,
+	McpConnectionInfo,
+	MemoryStats,
 } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
 import { Switch } from "@/components/ui/switch";
@@ -101,6 +106,8 @@ function SettingsPage() {
 	const { tab } = Route.useSearch();
 	const { vaultPath, selectVault, closeVault } = useVault();
 	const { state, logs, health } = useBackend();
+	const { summary: githubSummary } = useGitHub();
+	const { sessions: claudeSessions } = useClaudeSessions();
 	const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
 	const [dailyFolder, setDailyFolder] = useState(DEFAULT_DAILY_FOLDER);
 	const [dailyFolderInput, setDailyFolderInput] = useState(
@@ -126,6 +133,10 @@ function SettingsPage() {
 		});
 	const [savedNotificationSettings, setSavedNotificationSettings] =
 		useState<WorkTimeNotificationSettings | null>(null);
+	const [mcpState, setMcpState] = useState<McpState | null>(null);
+	const [mcpConnectionInfo, setMcpConnectionInfo] = useState<McpConnectionInfo | null>(null);
+	const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
+	const [isMemoryLoading, setIsMemoryLoading] = useState(false);
 
 	const lastLogs = useMemo(() => logs.slice(-10), [logs]);
 	const dailyFolderValidation = useMemo(
@@ -273,6 +284,46 @@ function SettingsPage() {
 		};
 	}, []);
 
+	// MCP status effect
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api) {
+			return;
+		}
+		let mounted = true;
+		const fetchMcpStatus = () => {
+			api.getMcpStatus().then((value) => {
+				if (mounted) setMcpState(value);
+			}).catch(() => undefined);
+			api.getMcpConnectionInfo().then((value) => {
+				if (mounted) setMcpConnectionInfo(value);
+			}).catch(() => undefined);
+		};
+		fetchMcpStatus();
+		const off = api.onMcpStatus((value) => {
+			if (mounted) setMcpState(value);
+		});
+		return () => {
+			mounted = false;
+			off();
+		};
+	}, []);
+
+	// Memory stats effect
+	useEffect(() => {
+		const api = getElectronAPI();
+		if (!api || state?.status !== "running") {
+			return;
+		}
+		let mounted = true;
+		api.getMemoryStats().then((value) => {
+			if (mounted) setMemoryStats(value);
+		}).catch(() => undefined);
+		return () => {
+			mounted = false;
+		};
+	}, [state?.status]);
+
 	const handleSaveTemplate = async () => {
 		const api = getElectronAPI();
 		if (!api) {
@@ -361,6 +412,98 @@ function SettingsPage() {
 			toast.error("테스트 알림 발송에 실패했습니다");
 		}
 	};
+
+	const handleCopyMcpConfig = () => {
+		if (!mcpConnectionInfo) return;
+		const config = {
+			command: mcpConnectionInfo.command,
+			args: mcpConnectionInfo.args,
+			cwd: mcpConnectionInfo.cwd,
+		};
+		navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+		toast.success("MCP 설정이 클립보드에 복사되었습니다!");
+	};
+
+	const handleRefreshMemoryStats = async () => {
+		const api = getElectronAPI();
+		if (!api) return;
+		setIsMemoryLoading(true);
+		try {
+			const stats = await api.getMemoryStats();
+			setMemoryStats(stats);
+			toast.success("메모리 통계가 새로고침되었습니다!");
+		} catch {
+			toast.error("메모리 통계 새로고침에 실패했습니다");
+		} finally {
+			setIsMemoryLoading(false);
+		}
+	};
+
+	const handleTriggerMemorySync = async () => {
+		const api = getElectronAPI();
+		if (!api) return;
+		try {
+			await api.triggerMemorySync();
+			toast.success("메모리 동기화가 시작되었습니다!");
+			// Refresh stats after a delay
+			setTimeout(handleRefreshMemoryStats, 2000);
+		} catch {
+			toast.error("메모리 동기화에 실패했습니다");
+		}
+	};
+
+	const handleTriggerChromaSync = async () => {
+		const api = getElectronAPI();
+		if (!api) return;
+		try {
+			await api.triggerChromaSync();
+			toast.success("ChromaDB 동기화가 시작되었습니다!");
+			setTimeout(handleRefreshMemoryStats, 2000);
+		} catch {
+			toast.error("ChromaDB 동기화에 실패했습니다");
+		}
+	};
+
+	const handleSyncGitHub = async () => {
+		const api = getElectronAPI();
+		if (!api || !githubSummary) return;
+		try {
+			const result = await api.syncGitHubToMemory({
+				prs: githubSummary.prs,
+				commits: githubSummary.commits,
+			});
+			if (result.total > 0) {
+				toast.success(`GitHub 활동 ${result.total}개가 Memory에 추가되었습니다!`);
+			} else {
+				toast.info("새로운 GitHub 활동이 없습니다");
+			}
+			setTimeout(handleRefreshMemoryStats, 1000);
+		} catch {
+			toast.error("GitHub 동기화에 실패했습니다");
+		}
+	};
+
+	const handleSyncClaudeSessions = async () => {
+		const api = getElectronAPI();
+		if (!api || !claudeSessions.length) return;
+		try {
+			const result = await api.syncClaudeSessionsToMemory({
+				sessions: claudeSessions,
+			});
+			if (result.processed > 0) {
+				toast.success(`Claude 세션 ${result.processed}개가 Memory에 추가되었습니다!`);
+			} else {
+				toast.info("새로운 Claude 세션이 없습니다");
+			}
+			setTimeout(handleRefreshMemoryStats, 1000);
+		} catch {
+			toast.error("Claude 세션 동기화에 실패했습니다");
+		}
+	};
+
+	const mcpStatus = mcpState?.status ?? "stopped";
+	const mcpStatusLabel = STATUS_LABELS[mcpStatus] ?? mcpStatus;
+	const mcpStatusClass = STATUS_CLASSES[mcpStatus] ?? STATUS_CLASSES.stopped;
 
 	return (
 		<div className="min-h-full p-6">
@@ -777,6 +920,223 @@ function SettingsPage() {
 											</div>
 										)}
 									</div>
+								</CardContent>
+							</Card>
+
+							<Card>
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<Server className="h-5 w-5" />
+										MCP Server
+									</CardTitle>
+									<CardDescription>
+										Model Context Protocol server for Claude Code integration
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div className="flex items-center justify-between">
+										<div className="flex items-center gap-3">
+											<span
+												className={cn("h-3 w-3 rounded-full", mcpStatusClass)}
+											/>
+											<span className="font-medium">{mcpStatusLabel}</span>
+										</div>
+										{mcpState?.pid && (
+											<span className="text-sm text-muted-foreground">
+												PID: {mcpState.pid}
+											</span>
+										)}
+									</div>
+									{mcpConnectionInfo && (
+										<div className="space-y-2">
+											<Label className="text-muted-foreground">
+												Connection Info (for Claude Code settings)
+											</Label>
+											<div className="rounded-md bg-gray-100 dark:bg-gray-900 p-3 font-mono text-xs space-y-1">
+												<p>
+													<span className="text-muted-foreground">command:</span>{" "}
+													{mcpConnectionInfo.command}
+												</p>
+												<p>
+													<span className="text-muted-foreground">args:</span>{" "}
+													{mcpConnectionInfo.args.join(" ")}
+												</p>
+												<p>
+													<span className="text-muted-foreground">cwd:</span>{" "}
+													{mcpConnectionInfo.cwd}
+												</p>
+											</div>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={handleCopyMcpConfig}
+											>
+												<Copy className="h-4 w-4 mr-2" />
+												Copy MCP Config
+											</Button>
+										</div>
+									)}
+									{mcpState?.lastError && (
+										<p className="text-sm text-destructive">
+											Error: {mcpState.lastError}
+										</p>
+									)}
+								</CardContent>
+							</Card>
+
+							<Card>
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<Database className="h-5 w-5" />
+										Memory System
+									</CardTitle>
+									<CardDescription>
+										Hybrid search memory with SQLite FTS5 + ChromaDB
+									</CardDescription>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									{state?.status !== "running" ? (
+										<div className="text-sm text-muted-foreground text-center py-4">
+											Backend must be running to view memory stats
+										</div>
+									) : memoryStats ? (
+										<>
+											<div className="grid grid-cols-2 gap-4">
+												<div className="space-y-1">
+													<Label className="text-muted-foreground text-xs">
+														Total Observations
+													</Label>
+													<p className="text-2xl font-semibold">
+														{memoryStats.total_observations}
+													</p>
+												</div>
+												<div className="space-y-1">
+													<Label className="text-muted-foreground text-xs">
+														ChromaDB Synced
+													</Label>
+													<p className="text-2xl font-semibold">
+														{memoryStats.chroma_synced}
+														{memoryStats.pending_sync > 0 && (
+															<span className="text-sm text-amber-500 ml-2">
+																(+{memoryStats.pending_sync} pending)
+															</span>
+														)}
+													</p>
+												</div>
+											</div>
+
+											{memoryStats.observations_by_type && Object.keys(memoryStats.observations_by_type).length > 0 && (
+												<div className="space-y-2">
+													<Label className="text-muted-foreground text-xs">
+														By Type
+													</Label>
+													<div className="flex flex-wrap gap-2">
+														{Object.entries(memoryStats.observations_by_type).map(
+															([type, count]) => (
+																<span
+																	key={type}
+																	className="px-2 py-1 bg-muted rounded text-xs"
+																>
+																	{type}: {count}
+																</span>
+															)
+														)}
+													</div>
+												</div>
+											)}
+
+											{memoryStats.observations_by_source && Object.keys(memoryStats.observations_by_source).length > 0 && (
+												<div className="space-y-2">
+													<Label className="text-muted-foreground text-xs">
+														By Source
+													</Label>
+													<div className="flex flex-wrap gap-2">
+														{Object.entries(memoryStats.observations_by_source).map(
+															([source, count]) => (
+																<span
+																	key={source}
+																	className="px-2 py-1 bg-muted rounded text-xs"
+																>
+																	{source}: {count}
+																</span>
+															)
+														)}
+													</div>
+												</div>
+											)}
+
+											<div className="flex items-center gap-2 pt-2">
+												<span
+													className={cn(
+														"h-2.5 w-2.5 rounded-full",
+														memoryStats.chroma_available
+															? "bg-emerald-500"
+															: "bg-red-500"
+													)}
+												/>
+												<span className="text-sm">
+													ChromaDB:{" "}
+													{memoryStats.chroma_available
+														? `Available (${memoryStats.chroma_collection_count} items)`
+														: "Not available"}
+												</span>
+											</div>
+
+											<div className="flex flex-wrap gap-2 pt-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={handleRefreshMemoryStats}
+													disabled={isMemoryLoading}
+												>
+													<RefreshCw
+														className={cn(
+															"h-4 w-4 mr-2",
+															isMemoryLoading && "animate-spin"
+														)}
+													/>
+													Refresh
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={handleSyncGitHub}
+													disabled={!githubSummary}
+												>
+													<Github className="h-4 w-4 mr-2" />
+													Sync GitHub
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={handleSyncClaudeSessions}
+													disabled={!claudeSessions.length}
+												>
+													<Bot className="h-4 w-4 mr-2" />
+													Sync Claude
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={handleTriggerMemorySync}
+												>
+													Sync Calendar
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={handleTriggerChromaSync}
+													disabled={!memoryStats.chroma_available}
+												>
+													Sync ChromaDB
+												</Button>
+											</div>
+										</>
+									) : (
+										<div className="text-sm text-muted-foreground text-center py-4">
+											Loading memory stats...
+										</div>
+									)}
 								</CardContent>
 							</Card>
 						</div>

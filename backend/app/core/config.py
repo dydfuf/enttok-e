@@ -16,8 +16,15 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_PORT_MIN = int(os.environ.get("GOOGLE_REDIRECT_PORT_MIN", "49800"))
 GOOGLE_REDIRECT_PORT_MAX = int(os.environ.get("GOOGLE_REDIRECT_PORT_MAX", "49899"))
 
+# ChromaDB Configuration
+CHROMA_PERSIST_DIR = os.path.join(APP_DATA_DIR, "chroma")
+CHROMA_COLLECTION_NAME = os.environ.get("CHROMA_COLLECTION_NAME", "observations")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+EMBEDDING_DIMENSION = 384  # Matches all-MiniLM-L6-v2
+
 
 def ensure_dirs() -> None:
     os.makedirs(APP_DATA_DIR, exist_ok=True)
     os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
 

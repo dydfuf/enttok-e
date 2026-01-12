@@ -12,7 +12,17 @@
       "Bash(tree:*)",
       "Bash(mkdir:*)",
       "Bash(cat:*)",
-      "Bash(pnpm exec tsc:*)"
+      "Bash(pnpm exec tsc:*)",
+      "Bash(grep:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(uv python install:*)",
+      "Bash(uv venv:*)",
+      "Bash(uv sync:*)",
+      "Bash(curl:*)",
+      "Bash(sqlite3:*)",
+      "Bash(python3:*)",
+      "Bash(pnpm vite build:*)"
     ]
   }
 }
