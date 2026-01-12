@@ -70,6 +70,14 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("store:get-daily-calendar-collapsed"),
   setDailyCalendarCollapsed: (collapsed: boolean) =>
     ipcRenderer.invoke("store:set-daily-calendar-collapsed", collapsed),
+  getAssistantSidebarWidth: () =>
+    ipcRenderer.invoke("store:get-assistant-sidebar-width"),
+  setAssistantSidebarWidth: (width: number) =>
+    ipcRenderer.invoke("store:set-assistant-sidebar-width", width),
+  getAssistantSidebarOpen: () =>
+    ipcRenderer.invoke("store:get-assistant-sidebar-open"),
+  setAssistantSidebarOpen: (open: boolean) =>
+    ipcRenderer.invoke("store:set-assistant-sidebar-open", open),
   getDailyNotesFolder: () => ipcRenderer.invoke("store:get-daily-notes-folder"),
   setDailyNotesFolder: (folder: string) =>
     ipcRenderer.invoke("store:set-daily-notes-folder", folder),

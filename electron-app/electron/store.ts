@@ -34,6 +34,8 @@ interface StoreSchema {
   recentVaults: VaultInfo[];
   maxRecentVaults: number;
   dailyCalendarCollapsed: boolean;
+  assistantSidebarWidth: number;
+  assistantSidebarOpen: boolean;
   dailyNotesFolder: string;
   dailyNoteTemplate: string;
   assetsFolder: string;
@@ -90,6 +92,8 @@ const DEFAULT_STATUS_BAR_PREFERENCES: StatusBarPreferences = {
   showCharCount: true,
 };
 
+const DEFAULT_ASSISTANT_SIDEBAR_WIDTH = 16 * 16;
+
 const store = new Store<StoreSchema>({
   name: "enttok-config",
   defaults: {
@@ -97,6 +101,8 @@ const store = new Store<StoreSchema>({
     recentVaults: [],
     maxRecentVaults: 10,
     dailyCalendarCollapsed: true,
+    assistantSidebarWidth: DEFAULT_ASSISTANT_SIDEBAR_WIDTH,
+    assistantSidebarOpen: true,
     dailyNotesFolder: "daily",
     dailyNoteTemplate: DEFAULT_DAILY_NOTE_TEMPLATE,
     assetsFolder: "assets",
@@ -165,6 +171,22 @@ export function getDailyCalendarCollapsed(): boolean {
 
 export function setDailyCalendarCollapsed(collapsed: boolean): void {
   store.set("dailyCalendarCollapsed", collapsed);
+}
+
+export function getAssistantSidebarWidth(): number {
+  return store.get("assistantSidebarWidth");
+}
+
+export function setAssistantSidebarWidth(width: number): void {
+  store.set("assistantSidebarWidth", width);
+}
+
+export function getAssistantSidebarOpen(): boolean {
+  return store.get("assistantSidebarOpen");
+}
+
+export function setAssistantSidebarOpen(open: boolean): void {
+  store.set("assistantSidebarOpen", open);
 }
 
 export function getDailyNotesFolder(): string {

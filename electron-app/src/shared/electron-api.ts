@@ -355,6 +355,10 @@ export type ElectronAPI = {
   setDailyCalendarCollapsed: (
     collapsed: boolean
   ) => Promise<{ success: boolean }>;
+  getAssistantSidebarWidth: () => Promise<number>;
+  setAssistantSidebarWidth: (width: number) => Promise<{ success: boolean }>;
+  getAssistantSidebarOpen: () => Promise<boolean>;
+  setAssistantSidebarOpen: (open: boolean) => Promise<{ success: boolean }>;
   getDailyNotesFolder: () => Promise<string>;
   setDailyNotesFolder: (folder: string) => Promise<{ success: boolean }>;
   getDailyNoteTemplate: () => Promise<string>;

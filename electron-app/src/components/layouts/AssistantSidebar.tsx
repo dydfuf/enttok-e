@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Activity, Bot, BookOpen, ChevronDown, ChevronRight, FileText, Loader2, Plus, X } from "lucide-react";
+import { Activity, Bot, BookOpen, ChevronDown, ChevronRight, FileText, Loader2, Plus, RotateCcw, Square, X } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +23,15 @@ import type { ActivityStreamItem } from "@/lib/activity-types";
 
 export type ChatRole = "user" | "assistant";
 
+export interface ChatRequest {
+  prompt: string;
+  selectedText: string | null;
+  noteContent: string | null;
+  includeNoteContext: boolean;
+  activityContext: string | null;
+  useMemorySearch: boolean;
+}
+
 // Memory reference from hybrid search
 export interface MemoryReference {
   observation_id: string;
@@ -40,9 +49,10 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   timestamp: string;
-  status?: "searching" | "pending" | "streaming" | "complete" | "error";
+  status?: "searching" | "pending" | "streaming" | "complete" | "error" | "canceled";
   error?: string | null;
   memoryReferences?: MemoryReference[];
+  request?: ChatRequest;
 }
 
 type ClaudeAPI = Pick<
@@ -54,6 +64,7 @@ const MAX_SELECTION_CHARS = 2000;
 const MAX_NOTE_CONTEXT_CHARS = 4000;
 const MAX_ACTIVITY_CONTEXT_CHARS = 4000;
 const MAX_MEMORY_RESULTS = 100;
+const AUTO_SCROLL_THRESHOLD = 48;
 
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
@@ -142,6 +153,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
 
   const editorContext = useEditorOptional();
   const claudeAPI = useMemo<ClaudeAPI | null>(() => getElectronAPI(), []);
+  const requestControllersRef = useRef<Map<string, AbortController>>(new Map());
   const resizeStateRef = useRef({
     startX: 0,
     isResizing: false,
@@ -158,59 +170,84 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   );
 
   const pollJob = useCallback(
-    async (jobId: string, messageId: string) => {
+    async (jobId: string, messageId: string, signal: AbortSignal) => {
       if (!claudeAPI) {
         updateMessage(messageId, { status: "error", error: "API unavailable" });
+        requestControllersRef.current.delete(messageId);
         return;
       }
 
       let attempts = 0;
       const maxAttempts = 60;
 
-      while (attempts < maxAttempts) {
-        attempts += 1;
-        try {
-          const job = await claudeAPI.getJob(jobId);
-          const output = extractOutput(job);
-
-          if (job.status === "succeeded") {
-            updateMessage(messageId, {
-              content: output || "No response",
-              status: "complete",
-            });
+      try {
+        while (attempts < maxAttempts) {
+          if (signal.aborted) {
+            updateMessage(messageId, { status: "canceled", error: "Canceled" });
             return;
           }
 
-          if (job.status === "failed" || job.status === "canceled") {
+          attempts += 1;
+          try {
+            const job = await claudeAPI.getJob(jobId);
+            const output = extractOutput(job);
+
+            if (signal.aborted) {
+              updateMessage(messageId, { status: "canceled", error: "Canceled" });
+              return;
+            }
+
+            if (job.status === "succeeded") {
+              updateMessage(messageId, {
+                content: output || "No response",
+                status: "complete",
+              });
+              return;
+            }
+
+            if (job.status === "failed" || job.status === "canceled") {
+              updateMessage(messageId, {
+                content: output || "Request failed",
+                status: "error",
+                error: output,
+              });
+              return;
+            }
+
+            if (output) {
+              updateMessage(messageId, { content: output, status: "streaming" });
+            }
+          } catch (error) {
             updateMessage(messageId, {
-              content: output || "Request failed",
               status: "error",
-              error: output,
+              error: error instanceof Error ? error.message : "Fetch failed",
             });
             return;
           }
-
-          if (output) {
-            updateMessage(messageId, { content: output, status: "streaming" });
-          }
-        } catch (error) {
-          updateMessage(messageId, {
-            status: "error",
-            error: error instanceof Error ? error.message : "Fetch failed",
-          });
-          return;
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
 
-      updateMessage(messageId, { status: "error", error: "Request timeout" });
+        updateMessage(messageId, { status: "error", error: "Request timeout" });
+      } finally {
+        requestControllersRef.current.delete(messageId);
+      }
     },
     [claudeAPI, updateMessage]
   );
 
   const handleSubmit = useCallback(
-    async (userPrompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean, activityCtx: string | null) => {
-      if (!claudeAPI || !userPrompt.trim()) return;
+    async (
+      userPrompt: string,
+      selectedText: string | null,
+      noteContent: string | null,
+      includeNoteContext: boolean,
+      activityCtx: string | null,
+      options?: { useMemorySearch?: boolean }
+    ) => {
+      const trimmedPrompt = userPrompt.trim();
+      if (!claudeAPI || !trimmedPrompt) return;
+
+      const memorySearchEnabled = options?.useMemorySearch ?? useMemorySearch;
 
       setIsSubmitting(true);
       // Clear activity context after including it in the prompt
@@ -218,22 +255,41 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
         setActivityContext(null);
       }
 
+      const assistantMessageId = `assistant-${Date.now()}`;
+      const request: ChatRequest = {
+        prompt: trimmedPrompt,
+        selectedText,
+        noteContent,
+        includeNoteContext,
+        activityContext: activityCtx,
+        useMemorySearch: memorySearchEnabled,
+      };
+
+      const controller = new AbortController();
+      requestControllersRef.current.set(assistantMessageId, controller);
+      const { signal } = controller;
+
+      const markCanceled = () => {
+        requestControllersRef.current.delete(assistantMessageId);
+        updateMessage(assistantMessageId, { status: "canceled", error: "Canceled" });
+      };
+
       // Add messages immediately for better UX
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
         role: "user",
-        content: userPrompt,
+        content: trimmedPrompt,
         timestamp: new Date().toISOString(),
         status: "complete",
       };
 
-      const assistantMessageId = `assistant-${Date.now()}`;
       const assistantMessage: ChatMessage = {
         id: assistantMessageId,
         role: "assistant",
         content: "",
         timestamp: new Date().toISOString(),
-        status: useMemorySearch ? "searching" : "pending",
+        status: memorySearchEnabled ? "searching" : "pending",
+        request,
       };
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
@@ -241,30 +297,47 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
       // Search memory for relevant context (if enabled)
       let memoryReferences: MemoryReference[] = [];
       let memoryContext: string | null = null;
-      if (useMemorySearch) {
-        try {
-          const searchResult: MemorySearchResult = await claudeAPI.searchMemory({
-            query: userPrompt,
-            limit: MAX_MEMORY_RESULTS,
-          });
-          if (searchResult.results && searchResult.results.length > 0) {
-            memoryReferences = searchResult.results;
-            memoryContext = formatMemoryAsContext(memoryReferences);
+      try {
+        if (memorySearchEnabled) {
+          try {
+            const searchResult: MemorySearchResult = await claudeAPI.searchMemory({
+              query: trimmedPrompt,
+              limit: MAX_MEMORY_RESULTS,
+            });
+            if (searchResult.results && searchResult.results.length > 0) {
+              memoryReferences = searchResult.results;
+              memoryContext = formatMemoryAsContext(memoryReferences);
+            }
+          } catch {
+            // Memory search is optional, continue without it
           }
-        } catch {
-          // Memory search is optional, continue without it
+
+          if (signal.aborted) {
+            markCanceled();
+            return;
+          }
+
+          // Update with memory references and transition to pending
+          updateMessage(assistantMessageId, {
+            status: "pending",
+            memoryReferences: memoryReferences.length > 0 ? memoryReferences : undefined,
+          });
         }
 
-        // Update with memory references and transition to pending
-        updateMessage(assistantMessageId, {
-          status: "pending",
-          memoryReferences: memoryReferences.length > 0 ? memoryReferences : undefined,
-        });
-      }
+        if (signal.aborted) {
+          markCanceled();
+          return;
+        }
 
-      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext, activityCtx, memoryContext);
+        const fullPrompt = buildPromptWithContext(
+          trimmedPrompt,
+          selectedText,
+          noteContent,
+          includeNoteContext,
+          activityCtx,
+          memoryContext
+        );
 
-      try {
         let activeSessionId = sessionId;
         if (!activeSessionId) {
           const session: ClaudeSessionResponse =
@@ -273,13 +346,28 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
           setSessionId(activeSessionId);
         }
 
+        if (signal.aborted) {
+          markCanceled();
+          return;
+        }
+
         const response: ClaudeJobResponse = await claudeAPI.spawnClaude({
           prompt: fullPrompt,
           session_id: activeSessionId,
         });
 
-        void pollJob(response.job_id, assistantMessageId);
+        if (signal.aborted) {
+          markCanceled();
+          return;
+        }
+
+        void pollJob(response.job_id, assistantMessageId, signal);
       } catch (error) {
+        if (signal.aborted) {
+          markCanceled();
+          return;
+        }
+        requestControllersRef.current.delete(assistantMessageId);
         updateMessage(assistantMessageId, {
           status: "error",
           error: error instanceof Error ? error.message : "Request failed",
@@ -292,10 +380,30 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
     [claudeAPI, pollJob, sessionId, updateMessage, useMemorySearch]
   );
 
+  const cancelAllRequests = useCallback(() => {
+    for (const controller of requestControllersRef.current.values()) {
+      controller.abort();
+    }
+    requestControllersRef.current.clear();
+  }, []);
+
+  const handleStop = useCallback(
+    (messageId: string) => {
+      const controller = requestControllersRef.current.get(messageId);
+      if (!controller) return;
+      controller.abort();
+      requestControllersRef.current.delete(messageId);
+      updateMessage(messageId, { status: "canceled", error: "Canceled" });
+      setIsSubmitting(false);
+    },
+    [updateMessage]
+  );
+
   const handleNewSession = useCallback(() => {
+    cancelAllRequests();
     setSessionId(null);
     setMessages([]);
-  }, []);
+  }, [cancelAllRequests]);
 
   const handleIncludeActivity = useCallback((activityItems: ActivityStreamItem[]) => {
     if (activityItems.length === 0) return;
@@ -427,6 +535,45 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      cancelAllRequests();
+    };
+  }, [cancelAllRequests]);
+
+  const activeAssistantMessage = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === "assistant" &&
+            (message.status === "searching" ||
+              message.status === "pending" ||
+              message.status === "streaming")
+        ) ?? null,
+    [messages]
+  );
+
+  const handleStopActive = useCallback(() => {
+    if (!activeAssistantMessage) return;
+    handleStop(activeAssistantMessage.id);
+  }, [activeAssistantMessage, handleStop]);
+
+  const handleRetry = useCallback(
+    (request: ChatRequest) => {
+      handleSubmit(
+        request.prompt,
+        request.selectedText,
+        request.noteContent,
+        request.includeNoteContext,
+        request.activityContext,
+        { useMemorySearch: request.useMemorySearch }
+      );
+    },
+    [handleSubmit]
+  );
+
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="right">
       <SidebarContent className="group-data-[collapsible=icon]:hidden">
@@ -439,14 +586,17 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
           includeNoteContext={editorContext?.includeNoteContext ?? true}
           activityContext={activityContext}
           useMemorySearch={useMemorySearch}
+          canStop={Boolean(activeAssistantMessage)}
           onIncludeNoteContextChange={editorContext?.setIncludeNoteContext}
           onUseMemorySearchChange={setUseMemorySearch}
           onClearSelection={editorContext?.clearSelection}
           onClearActivityContext={handleClearActivityContext}
           onSubmit={handleSubmit}
           onNewSession={handleNewSession}
+          onStop={handleStopActive}
           onApply={handleApply}
           onCopy={handleCopy}
+          onRetry={handleRetry}
         />
       </SidebarContent>
       <SidebarRail
@@ -469,14 +619,24 @@ interface AssistantTabProps {
   includeNoteContext: boolean;
   activityContext: string | null;
   useMemorySearch: boolean;
+  canStop: boolean;
   onIncludeNoteContextChange?: (include: boolean) => void;
   onUseMemorySearchChange?: (use: boolean) => void;
   onClearSelection?: () => void;
   onClearActivityContext?: () => void;
-  onSubmit: (prompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean, activityContext: string | null) => void;
+  onSubmit: (
+    prompt: string,
+    selectedText: string | null,
+    noteContent: string | null,
+    includeNoteContext: boolean,
+    activityContext: string | null,
+    options?: { useMemorySearch?: boolean }
+  ) => void;
   onNewSession: () => void;
+  onStop: () => void;
   onApply: (text: string) => void;
   onCopy: (text: string) => void;
+  onRetry: (request: ChatRequest) => void;
 }
 
 function AssistantTab({
@@ -488,21 +648,27 @@ function AssistantTab({
   includeNoteContext,
   activityContext,
   useMemorySearch,
+  canStop,
   onIncludeNoteContextChange,
   onUseMemorySearchChange,
   onClearSelection,
   onClearActivityContext,
   onSubmit,
   onNewSession,
+  onStop,
   onApply,
   onCopy,
+  onRetry,
 }: AssistantTabProps) {
   const [inputValue, setInputValue] = useState("");
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const noteCheckboxId = useId();
   const memoryCheckboxId = useId();
 
   const handleSubmit = () => {
     if (!inputValue.trim() || isSubmitting) return;
+    setAutoScrollEnabled(true);
     onSubmit(inputValue.trim(), selectedText, noteContent, includeNoteContext, activityContext);
     setInputValue("");
   };
@@ -513,6 +679,32 @@ function AssistantTab({
       handleSubmit();
     }
   };
+
+  const handleScroll = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const distanceToBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    setAutoScrollEnabled(distanceToBottom <= AUTO_SCROLL_THRESHOLD);
+  }, []);
+
+  useEffect(() => {
+    if (!autoScrollEnabled) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [autoScrollEnabled, messages]);
+
+  const handleRetry = useCallback(
+    (request: ChatRequest) => {
+      setAutoScrollEnabled(true);
+      onRetry(request);
+    },
+    [onRetry]
+  );
 
   const hasSelection = Boolean(selectedText);
   const hasNoteContent = Boolean(noteContent);
@@ -526,18 +718,35 @@ function AssistantTab({
         <span className="text-xs text-muted-foreground">
           {sessionId ? "Session active" : "No session"}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          onClick={onNewSession}
-        >
-          <Plus className="size-3" />
-          New
-        </Button>
+        <div className="flex items-center gap-2">
+          {canStop && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+              onClick={onStop}
+            >
+              <Square className="size-3" />
+              Stop
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={onNewSession}
+          >
+            <Plus className="size-3" />
+            New
+          </Button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-3 space-y-3"
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <Bot className="size-8 mb-2 opacity-50" />
@@ -553,6 +762,7 @@ function AssistantTab({
               message={msg}
               onApply={onApply}
               onCopy={onCopy}
+              onRetry={handleRetry}
             />
           ))
         )}
@@ -661,15 +871,17 @@ interface MessageBubbleProps {
   message: ChatMessage;
   onApply: (text: string) => void;
   onCopy: (text: string) => void;
+  onRetry: (request: ChatRequest) => void;
 }
 
-function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
+function MessageBubble({ message, onApply, onCopy, onRetry }: MessageBubbleProps) {
   const [showReferences, setShowReferences] = useState(false);
   const isUser = message.role === "user";
   const isSearching = message.status === "searching";
   const isPending = message.status === "pending";
   const isStreaming = message.status === "streaming";
   const isError = message.status === "error";
+  const isCanceled = message.status === "canceled";
   const hasMemoryReferences = !isUser && message.memoryReferences && message.memoryReferences.length > 0;
 
   return (
@@ -697,6 +909,8 @@ function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
             <Loader2 className="size-3 animate-spin" />
             <span>Thinking...</span>
           </div>
+        ) : isCanceled && !message.content ? (
+          <div className="text-muted-foreground">Canceled</div>
         ) : (
           <div className="whitespace-pre-wrap break-words">
             {message.content || (isError ? "An error occurred" : "")}
@@ -743,6 +957,20 @@ function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {!isUser && (isError || isCanceled) && message.request && (
+        <div className="flex gap-1 mt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs px-2"
+            onClick={() => onRetry(message.request!)}
+          >
+            <RotateCcw className="size-3 mr-1" />
+            Retry
+          </Button>
         </div>
       )}
 

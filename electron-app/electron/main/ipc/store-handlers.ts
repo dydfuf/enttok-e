@@ -8,6 +8,10 @@ import {
   removeFromRecentVaults,
   getDailyCalendarCollapsed,
   setDailyCalendarCollapsed,
+  getAssistantSidebarWidth,
+  setAssistantSidebarWidth,
+  getAssistantSidebarOpen,
+  setAssistantSidebarOpen,
   getDailyNotesFolder,
   setDailyNotesFolder,
   getDailyNoteTemplate,
@@ -44,6 +48,23 @@ export function registerStoreHandlers() {
   );
   ipcMain.handle("store:set-daily-calendar-collapsed", (_, collapsed: boolean) => {
     setDailyCalendarCollapsed(collapsed);
+    return { success: true };
+  });
+  ipcMain.handle("store:get-assistant-sidebar-width", () =>
+    getAssistantSidebarWidth()
+  );
+  ipcMain.handle(
+    "store:set-assistant-sidebar-width",
+    (_, width: number) => {
+      setAssistantSidebarWidth(width);
+      return { success: true };
+    }
+  );
+  ipcMain.handle("store:get-assistant-sidebar-open", () =>
+    getAssistantSidebarOpen()
+  );
+  ipcMain.handle("store:set-assistant-sidebar-open", (_, open: boolean) => {
+    setAssistantSidebarOpen(open);
     return { success: true };
   });
   ipcMain.handle("store:get-daily-notes-folder", () => getDailyNotesFolder());

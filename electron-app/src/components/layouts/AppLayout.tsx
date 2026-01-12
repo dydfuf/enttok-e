@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { NavBar } from "./NavBar";
@@ -6,6 +6,7 @@ import AppSidebar from "./AppSidebar";
 import AssistantSidebar from "./AssistantSidebar";
 import { StatusBar } from "./StatusBar";
 import { SidebarToggleBridge } from "@/contexts/SidebarControlsContext";
+import { getElectronAPI } from "@/lib/electron";
 
 const ASSISTANT_SIDEBAR_DEFAULT_WIDTH = 16 * 16;
 const ASSISTANT_SIDEBAR_MIN_WIDTH = 240;
@@ -15,6 +16,8 @@ export default function AppLayout() {
   const [assistantSidebarWidth, setAssistantSidebarWidth] = useState(
     ASSISTANT_SIDEBAR_DEFAULT_WIDTH
   );
+  const [assistantSidebarOpen, setAssistantSidebarOpen] = useState(true);
+  const electronAPI = useMemo(() => getElectronAPI(), []);
 
   const handleAssistantResize = useCallback((nextWidth: number) => {
     const clampedWidth = Math.min(
@@ -23,6 +26,46 @@ export default function AppLayout() {
     );
     setAssistantSidebarWidth(clampedWidth);
   }, []);
+
+  const handleAssistantOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setAssistantSidebarOpen(nextOpen);
+      if (electronAPI) {
+        void electronAPI.setAssistantSidebarOpen(nextOpen);
+      }
+    },
+    [electronAPI]
+  );
+
+  useEffect(() => {
+    if (!electronAPI) return;
+    let isMounted = true;
+    Promise.all([
+      electronAPI.getAssistantSidebarWidth(),
+      electronAPI.getAssistantSidebarOpen(),
+    ])
+      .then(([width, open]) => {
+        if (!isMounted) return;
+        const clampedWidth = Math.min(
+          ASSISTANT_SIDEBAR_MAX_WIDTH,
+          Math.max(ASSISTANT_SIDEBAR_MIN_WIDTH, Math.round(width))
+        );
+        setAssistantSidebarWidth(clampedWidth);
+        setAssistantSidebarOpen(open);
+      })
+      .catch(() => undefined);
+    return () => {
+      isMounted = false;
+    };
+  }, [electronAPI]);
+
+  useEffect(() => {
+    if (!electronAPI) return;
+    const timeout = window.setTimeout(() => {
+      void electronAPI.setAssistantSidebarWidth(assistantSidebarWidth);
+    }, 200);
+    return () => window.clearTimeout(timeout);
+  }, [assistantSidebarWidth, electronAPI]);
 
   const assistantSidebarStyle = useMemo(
     () =>
@@ -57,6 +100,8 @@ export default function AppLayout() {
           className="min-h-0 w-auto flex-none"
           keyboardShortcut="l"
           style={assistantSidebarStyle}
+          open={assistantSidebarOpen}
+          onOpenChange={handleAssistantOpenChange}
         >
           <SidebarToggleBridge side="right" />
           <AssistantSidebar onResize={handleAssistantResize} />
