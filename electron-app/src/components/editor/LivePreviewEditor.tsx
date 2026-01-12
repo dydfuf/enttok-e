@@ -789,18 +789,17 @@ export function LivePreviewEditor({
 
           selectionTimeoutRef.current = setTimeout(() => {
             const selection = update.state.selection.main;
-            const hasSelection = selection.from !== selection.to;
-
-            if (hasSelection && onSelectionChangeRef.current) {
-              const selectedText = update.state.sliceDoc(selection.from, selection.to);
-              onSelectionChangeRef.current({
-                text: selectedText,
-                from: selection.from,
-                to: selection.to,
-              });
-            } else if (onSelectionChangeRef.current) {
-              onSelectionChangeRef.current(null);
+            if (!onSelectionChangeRef.current) {
+              return;
             }
+            const selectedText = selection.from === selection.to
+              ? ""
+              : update.state.sliceDoc(selection.from, selection.to);
+            onSelectionChangeRef.current({
+              text: selectedText,
+              from: selection.from,
+              to: selection.to,
+            });
           }, 150);
         }
       }),

@@ -214,6 +214,20 @@ export type WorkTimeNotificationSettings = {
   workEndMessage: string;
 };
 
+export type StatusBarPreferences = {
+  showBackendStatus: boolean;
+  showSaveStatus: boolean;
+  showGitHubStatus: boolean;
+  showActivity: boolean;
+  showStatusMessage: boolean;
+  showNoteInfo: boolean;
+  showVaultInfo: boolean;
+  showSelection: boolean;
+  showCursor: boolean;
+  showWordCount: boolean;
+  showCharCount: boolean;
+};
+
 // Claude Code Session Types
 export type ClaudeSessionMessage = {
   type: "user" | "assistant" | "system" | "summary";
@@ -350,6 +364,11 @@ export type ElectronAPI = {
   getSummarizePrompt: () => Promise<string>;
   setSummarizePrompt: (prompt: string) => Promise<{ success: boolean }>;
   resetSummarizePrompt: () => Promise<{ success: boolean; prompt: string }>;
+  getStatusBarPreferences: () => Promise<StatusBarPreferences>;
+  setStatusBarPreferences: (
+    preferences: StatusBarPreferences
+  ) => Promise<{ success: boolean }>;
+  resetStatusBarPreferences: () => Promise<StatusBarPreferences>;
   startBackend: () => Promise<BackendState>;
   stopBackend: () => Promise<BackendState>;
   getBackendStatus: () => Promise<BackendState>;

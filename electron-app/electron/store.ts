@@ -15,6 +15,20 @@ export interface WorkTimeNotificationSettings {
   workEndMessage: string;
 }
 
+export interface StatusBarPreferences {
+  showBackendStatus: boolean;
+  showSaveStatus: boolean;
+  showGitHubStatus: boolean;
+  showActivity: boolean;
+  showStatusMessage: boolean;
+  showNoteInfo: boolean;
+  showVaultInfo: boolean;
+  showSelection: boolean;
+  showCursor: boolean;
+  showWordCount: boolean;
+  showCharCount: boolean;
+}
+
 interface StoreSchema {
   currentVaultPath: string | null;
   recentVaults: VaultInfo[];
@@ -28,6 +42,7 @@ interface StoreSchema {
   claudeProjectPaths: string[];
   claudeProjectPath?: string | null;
   summarizePrompt: string;
+  statusBarPreferences: StatusBarPreferences;
 }
 
 const DEFAULT_DAILY_NOTE_TEMPLATE = `---
@@ -61,6 +76,20 @@ const DEFAULT_SUMMARIZE_PROMPT = `오늘 한 일을 요약해줘.
 - 주요 작업을 카테고리별로 그룹핑
 - 각 항목은 불릿 포인트로 작성`;
 
+const DEFAULT_STATUS_BAR_PREFERENCES: StatusBarPreferences = {
+  showBackendStatus: true,
+  showSaveStatus: true,
+  showGitHubStatus: true,
+  showActivity: true,
+  showStatusMessage: true,
+  showNoteInfo: true,
+  showVaultInfo: true,
+  showSelection: true,
+  showCursor: true,
+  showWordCount: true,
+  showCharCount: true,
+};
+
 const store = new Store<StoreSchema>({
   name: "enttok-config",
   defaults: {
@@ -82,8 +111,15 @@ const store = new Store<StoreSchema>({
     claudeProjectPaths: [],
     claudeProjectPath: null,
     summarizePrompt: DEFAULT_SUMMARIZE_PROMPT,
+    statusBarPreferences: DEFAULT_STATUS_BAR_PREFERENCES,
   },
 });
+
+function normalizeStatusBarPreferences(
+  value: StatusBarPreferences | null | undefined
+): StatusBarPreferences {
+  return { ...DEFAULT_STATUS_BAR_PREFERENCES, ...(value ?? {}) };
+}
 
 export function getCurrentVaultPath(): string | null {
   return store.get("currentVaultPath");
@@ -233,6 +269,22 @@ export function setSummarizePrompt(prompt: string): void {
 
 export function resetSummarizePrompt(): void {
   store.set("summarizePrompt", DEFAULT_SUMMARIZE_PROMPT);
+}
+
+export function getStatusBarPreferences(): StatusBarPreferences {
+  const stored = store.get("statusBarPreferences");
+  return normalizeStatusBarPreferences(stored);
+}
+
+export function setStatusBarPreferences(
+  preferences: StatusBarPreferences
+): void {
+  store.set("statusBarPreferences", normalizeStatusBarPreferences(preferences));
+}
+
+export function resetStatusBarPreferences(): StatusBarPreferences {
+  store.set("statusBarPreferences", DEFAULT_STATUS_BAR_PREFERENCES);
+  return DEFAULT_STATUS_BAR_PREFERENCES;
 }
 
 export { DEFAULT_SUMMARIZE_PROMPT };

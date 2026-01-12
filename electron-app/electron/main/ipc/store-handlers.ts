@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import type { StatusBarPreferences } from "../../store.js";
 import {
   getCurrentVaultPath,
   setCurrentVaultPath,
@@ -16,6 +17,9 @@ import {
   getSummarizePrompt,
   setSummarizePrompt,
   resetSummarizePrompt,
+  getStatusBarPreferences,
+  setStatusBarPreferences,
+  resetStatusBarPreferences,
   DEFAULT_SUMMARIZE_PROMPT,
 } from "../../store.js";
 
@@ -70,4 +74,19 @@ export function registerStoreHandlers() {
     resetSummarizePrompt();
     return { success: true, prompt: DEFAULT_SUMMARIZE_PROMPT };
   });
+
+  // Status bar preferences
+  ipcMain.handle("store:get-status-bar-preferences", () =>
+    getStatusBarPreferences()
+  );
+  ipcMain.handle(
+    "store:set-status-bar-preferences",
+    (_, preferences: StatusBarPreferences) => {
+      setStatusBarPreferences(preferences);
+      return { success: true };
+    }
+  );
+  ipcMain.handle("store:reset-status-bar-preferences", () =>
+    resetStatusBarPreferences()
+  );
 }

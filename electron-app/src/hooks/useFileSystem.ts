@@ -7,6 +7,7 @@ export interface UseFileSystemReturn {
   content: string;
   isDirty: boolean;
   isLoading: boolean;
+  isSaving: boolean;
   error: string | null;
   openFile: () => Promise<void>;
   saveFile: () => Promise<boolean>;
@@ -22,6 +23,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
   const [content, setContentState] = useState(initialContent);
   const [savedContent, setSavedContent] = useState(initialContent);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isDirty = content !== savedContent;
@@ -69,6 +71,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
 
   const saveFileAs = useCallback(async (): Promise<boolean> => {
     setIsLoading(true);
+    setIsSaving(true);
     setError(null);
     try {
       const result = await electronAPI.saveFileDialog(
@@ -96,6 +99,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
       return false;
     } finally {
       setIsLoading(false);
+      setIsSaving(false);
     }
   }, [electronAPI, filePath, content]);
 
@@ -105,6 +109,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
     }
 
     setIsLoading(true);
+    setIsSaving(true);
     setError(null);
     try {
       const result = await electronAPI.writeFile(filePath, content);
@@ -119,6 +124,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
       return false;
     } finally {
       setIsLoading(false);
+      setIsSaving(false);
     }
   }, [electronAPI, filePath, content, saveFileAs]);
 
@@ -158,6 +164,7 @@ export function useFileSystem(initialContent = ""): UseFileSystemReturn {
     content,
     isDirty,
     isLoading,
+    isSaving,
     error,
     openFile,
     saveFile,

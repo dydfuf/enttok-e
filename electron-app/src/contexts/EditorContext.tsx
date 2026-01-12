@@ -11,11 +11,15 @@ export interface EditorContextValue {
   selectedText: string | null;
   selectionRange: SelectionRange | null;
   includeNoteContext: boolean;
+  isDirty: boolean;
+  isSaving: boolean;
 
   setNoteContent: (content: string | null) => void;
   setNotePath: (path: string | null) => void;
   setSelection: (text: string | null, range: SelectionRange | null) => void;
   setIncludeNoteContext: (include: boolean) => void;
+  setIsDirty: (isDirty: boolean) => void;
+  setIsSaving: (isSaving: boolean) => void;
   clearSelection: () => void;
   appendToNote: (text: string) => void;
 }
@@ -28,6 +32,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
   const [selectedText, setSelectedText] = React.useState<string | null>(null);
   const [selectionRange, setSelectionRange] = React.useState<SelectionRange | null>(null);
   const [includeNoteContext, setIncludeNoteContext] = React.useState(true);
+  const [isDirty, setIsDirty] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const setSelection = React.useCallback(
     (text: string | null, range: SelectionRange | null) => {
@@ -56,10 +62,14 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       selectedText,
       selectionRange,
       includeNoteContext,
+      isDirty,
+      isSaving,
       setNoteContent,
       setNotePath,
       setSelection,
       setIncludeNoteContext,
+      setIsDirty,
+      setIsSaving,
       clearSelection,
       appendToNote,
     }),
@@ -69,6 +79,8 @@ export function EditorProvider({ children }: { children: React.ReactNode }) {
       selectedText,
       selectionRange,
       includeNoteContext,
+      isDirty,
+      isSaving,
       setSelection,
       clearSelection,
       appendToNote,

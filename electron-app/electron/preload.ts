@@ -15,6 +15,7 @@ import type {
   MemoryStats,
   MemorySearchResult,
   ObservationSummary,
+  StatusBarPreferences,
 } from "../src/shared/electron-api";
 
 // Electron API를 렌더러 프로세스에 노출
@@ -85,6 +86,12 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("store:set-summarize-prompt", prompt) as Promise<{ success: boolean }>,
   resetSummarizePrompt: () =>
     ipcRenderer.invoke("store:reset-summarize-prompt") as Promise<{ success: boolean; prompt: string }>,
+  getStatusBarPreferences: () =>
+    ipcRenderer.invoke("store:get-status-bar-preferences"),
+  setStatusBarPreferences: (preferences: StatusBarPreferences) =>
+    ipcRenderer.invoke("store:set-status-bar-preferences", preferences),
+  resetStatusBarPreferences: () =>
+    ipcRenderer.invoke("store:reset-status-bar-preferences"),
 
   // Backend API
   startBackend: () => ipcRenderer.invoke("backend:start"),

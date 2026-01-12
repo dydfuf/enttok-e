@@ -35,6 +35,7 @@ export function EditorLayout({
     filePath,
     content,
     isDirty,
+    isSaving,
     isLoading,
     error,
     openFile,
@@ -125,14 +126,15 @@ export function EditorLayout({
 
   const handleSelectionChange = useCallback(
     (selection: SelectionInfo | null) => {
-      if (selection) {
-        editorContext?.setSelection(selection.text, {
-          from: selection.from,
-          to: selection.to,
-        });
-      } else {
+      if (!selection) {
         editorContext?.clearSelection();
+        return;
       }
+      const hasSelection = selection.from !== selection.to;
+      editorContext?.setSelection(hasSelection ? selection.text : null, {
+        from: selection.from,
+        to: selection.to,
+      });
     },
     [editorContext]
   );
@@ -154,7 +156,12 @@ export function EditorLayout({
   // Notify parent of dirty state changes
   useEffect(() => {
     onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+    editorContext?.setIsDirty(isDirty);
+  }, [editorContext, isDirty, onDirtyChange]);
+
+  useEffect(() => {
+    editorContext?.setIsSaving(isSaving);
+  }, [editorContext, isSaving]);
 
   // Auto-save functionality
   useAutoSave({
