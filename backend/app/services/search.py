@@ -144,23 +144,28 @@ async def search(
         observations = await memory_repo.fetch_observations(observation_ids)
         results = []
         for obs in observations:
+            # Create snippet from narrative (first 200 chars)
+            narrative = obs.get("narrative", "")
+            snippet = narrative[:200] + "..." if len(narrative) > 200 else narrative
+
             results.append({
                 "observation_id": obs["observation_id"],
                 "title": obs["title"],
+                "snippet": snippet,
                 "type": obs["type"],
                 "source": obs["source"],
                 "event_time": obs["event_time"],
-                "relevance_score": score_map.get(obs["observation_id"], 0),
+                "score": score_map.get(obs["observation_id"], 0),
             })
-        # Sort by relevance score
-        results.sort(key=lambda x: x["relevance_score"], reverse=True)
+        # Sort by score
+        results.sort(key=lambda x: x["score"], reverse=True)
     else:
         results = []
 
     return {
         "results": results,
-        "total_count": len(results),
-        "search_mode": search_mode,
+        "total": len(results),
+        "mode": search_mode,
         "query": query,
     }
 

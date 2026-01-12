@@ -40,7 +40,7 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   timestamp: string;
-  status?: "pending" | "streaming" | "complete" | "error";
+  status?: "searching" | "pending" | "streaming" | "complete" | "error";
   error?: string | null;
   memoryReferences?: MemoryReference[];
 }
@@ -136,6 +136,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityContext, setActivityContext] = useState<string | null>(null);
+  const [useMemorySearch, setUseMemorySearch] = useState(true);
   const { toggleSidebar } = useSidebar();
 
   const editorContext = useEditorOptional();
@@ -216,24 +217,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
         setActivityContext(null);
       }
 
-      // Search memory for relevant context
-      let memoryReferences: MemoryReference[] = [];
-      let memoryContext: string | null = null;
-      try {
-        const searchResult: MemorySearchResult = await claudeAPI.searchMemory({
-          query: userPrompt,
-          limit: MAX_MEMORY_RESULTS,
-        });
-        if (searchResult.results && searchResult.results.length > 0) {
-          memoryReferences = searchResult.results;
-          memoryContext = formatMemoryAsContext(memoryReferences);
-        }
-      } catch {
-        // Memory search is optional, continue without it
-      }
-
-      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext, activityCtx, memoryContext);
-
+      // Add messages immediately for better UX
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
         role: "user",
@@ -248,11 +232,36 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
         role: "assistant",
         content: "",
         timestamp: new Date().toISOString(),
-        status: "pending",
-        memoryReferences: memoryReferences.length > 0 ? memoryReferences : undefined,
+        status: useMemorySearch ? "searching" : "pending",
       };
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
+
+      // Search memory for relevant context (if enabled)
+      let memoryReferences: MemoryReference[] = [];
+      let memoryContext: string | null = null;
+      if (useMemorySearch) {
+        try {
+          const searchResult: MemorySearchResult = await claudeAPI.searchMemory({
+            query: userPrompt,
+            limit: MAX_MEMORY_RESULTS,
+          });
+          if (searchResult.results && searchResult.results.length > 0) {
+            memoryReferences = searchResult.results;
+            memoryContext = formatMemoryAsContext(memoryReferences);
+          }
+        } catch {
+          // Memory search is optional, continue without it
+        }
+
+        // Update with memory references and transition to pending
+        updateMessage(assistantMessageId, {
+          status: "pending",
+          memoryReferences: memoryReferences.length > 0 ? memoryReferences : undefined,
+        });
+      }
+
+      const fullPrompt = buildPromptWithContext(userPrompt, selectedText, noteContent, includeNoteContext, activityCtx, memoryContext);
 
       try {
         let activeSessionId = sessionId;
@@ -279,7 +288,7 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
         setIsSubmitting(false);
       }
     },
-    [claudeAPI, pollJob, sessionId, updateMessage]
+    [claudeAPI, pollJob, sessionId, updateMessage, useMemorySearch]
   );
 
   const handleNewSession = useCallback(() => {
@@ -397,7 +406,9 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
           noteContent={editorContext?.noteContent ?? null}
           includeNoteContext={editorContext?.includeNoteContext ?? true}
           activityContext={activityContext}
+          useMemorySearch={useMemorySearch}
           onIncludeNoteContextChange={editorContext?.setIncludeNoteContext}
+          onUseMemorySearchChange={setUseMemorySearch}
           onClearSelection={editorContext?.clearSelection}
           onClearActivityContext={handleClearActivityContext}
           onSubmit={handleSubmit}
@@ -425,7 +436,9 @@ interface AssistantTabProps {
   noteContent: string | null;
   includeNoteContext: boolean;
   activityContext: string | null;
+  useMemorySearch: boolean;
   onIncludeNoteContextChange?: (include: boolean) => void;
+  onUseMemorySearchChange?: (use: boolean) => void;
   onClearSelection?: () => void;
   onClearActivityContext?: () => void;
   onSubmit: (prompt: string, selectedText: string | null, noteContent: string | null, includeNoteContext: boolean, activityContext: string | null) => void;
@@ -442,7 +455,9 @@ function AssistantTab({
   noteContent,
   includeNoteContext,
   activityContext,
+  useMemorySearch,
   onIncludeNoteContextChange,
+  onUseMemorySearchChange,
   onClearSelection,
   onClearActivityContext,
   onSubmit,
@@ -451,7 +466,8 @@ function AssistantTab({
   onCopy,
 }: AssistantTabProps) {
   const [inputValue, setInputValue] = useState("");
-  const checkboxId = useId();
+  const noteCheckboxId = useId();
+  const memoryCheckboxId = useId();
 
   const handleSubmit = () => {
     if (!inputValue.trim() || isSubmitting) return;
@@ -558,22 +574,36 @@ function AssistantTab({
         />
 
         <div className="flex items-center justify-between">
-          {!hasSelection && hasNoteContent && (
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Checkbox
-                id={checkboxId}
-                checked={includeNoteContext}
-                onCheckedChange={(checked) => onIncludeNoteContextChange?.(Boolean(checked))}
+                id={memoryCheckboxId}
+                checked={useMemorySearch}
+                onCheckedChange={(checked) => onUseMemorySearchChange?.(Boolean(checked))}
               />
               <label
-                htmlFor={checkboxId}
+                htmlFor={memoryCheckboxId}
                 className="text-xs text-muted-foreground cursor-pointer"
               >
-                Include note
+                Memory
               </label>
             </div>
-          )}
-          {(hasSelection || !hasNoteContent) && <div />}
+            {!hasSelection && hasNoteContent && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={noteCheckboxId}
+                  checked={includeNoteContext}
+                  onCheckedChange={(checked) => onIncludeNoteContextChange?.(Boolean(checked))}
+                />
+                <label
+                  htmlFor={noteCheckboxId}
+                  className="text-xs text-muted-foreground cursor-pointer"
+                >
+                  Note
+                </label>
+              </div>
+            )}
+          </div>
 
           <Button
             size="sm"
@@ -604,6 +634,7 @@ interface MessageBubbleProps {
 function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
   const [showReferences, setShowReferences] = useState(false);
   const isUser = message.role === "user";
+  const isSearching = message.status === "searching";
   const isPending = message.status === "pending";
   const isStreaming = message.status === "streaming";
   const isError = message.status === "error";
@@ -624,7 +655,12 @@ function MessageBubble({ message, onApply, onCopy }: MessageBubbleProps) {
           isError && "border-destructive/50 bg-destructive/10"
         )}
       >
-        {isPending ? (
+        {isSearching ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            <span>Searching memory...</span>
+          </div>
+        ) : isPending ? (
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="size-3 animate-spin" />
             <span>Thinking...</span>

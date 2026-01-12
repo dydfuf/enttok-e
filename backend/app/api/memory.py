@@ -14,6 +14,7 @@ from app.schemas.memory import (
     ObservationSummary,
     SearchRequest,
     SearchResponse,
+    SearchResultItem,
     TimelineRequest,
     TimelineResponse,
     MemoryStats,
@@ -173,18 +174,19 @@ async def search_memory(
 
     return SearchResponse(
         results=[
-            ObservationSummary(
+            SearchResultItem(
                 observation_id=r["observation_id"],
                 title=r["title"],
+                snippet=r["snippet"],
                 type=r["type"],
                 source=r["source"],
                 event_time=r["event_time"],
-                relevance_score=r.get("relevance_score"),
+                score=r["score"],
             )
             for r in result["results"]
         ],
-        total_count=result["total_count"],
-        search_mode=result["search_mode"],
+        total=result["total"],
+        mode=result["mode"],
         query=result["query"],
     )
 

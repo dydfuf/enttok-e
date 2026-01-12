@@ -26,7 +26,7 @@ class ObservationCreate(ObservationBase):
 
 
 class ObservationSummary(BaseModel):
-    """Compact representation for search results (progressive disclosure layer 1)."""
+    """Compact representation for list results (progressive disclosure layer 1)."""
 
     observation_id: str
     title: str
@@ -34,6 +34,18 @@ class ObservationSummary(BaseModel):
     source: str
     event_time: str
     relevance_score: float | None = None
+
+
+class SearchResultItem(BaseModel):
+    """Search result item with snippet for display."""
+
+    observation_id: str
+    title: str
+    snippet: str
+    type: str
+    source: str
+    event_time: str
+    score: float
 
 
 class Observation(ObservationBase):
@@ -66,9 +78,9 @@ class SearchRequest(BaseModel):
 class SearchResponse(BaseModel):
     """Response model for search."""
 
-    results: list[ObservationSummary]
-    total_count: int
-    search_mode: str
+    results: list[SearchResultItem]
+    total: int
+    mode: str
     query: str
 
 
