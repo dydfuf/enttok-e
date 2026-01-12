@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EditorLayout } from "@/components/editor/EditorLayout";
-import { DailyHeader } from "@/components/daily/DailyHeader";
 
 type DailyNotePageProps = {
   date: Date;
@@ -24,8 +23,6 @@ export function DailyNotePage({
   const [filePath, setFilePath] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
-  const saveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,10 +56,6 @@ export function DailyNotePage({
       isMounted = false;
     };
   }, [vaultPath, date, createOrGetDailyNote]);
-
-  const handleSave = useCallback(() => {
-    saveRef.current?.();
-  }, []);
 
   // No vault selected
   if (!vaultPath) {
@@ -103,16 +96,11 @@ export function DailyNotePage({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-6 pt-6">
-        <DailyHeader date={date} isDirty={isDirty} onSave={handleSave} />
-      </div>
       <div className="flex-1 overflow-hidden">
         <EditorLayout
           initialFilePath={filePath}
           className="h-full"
           hideToolbar
-          onDirtyChange={setIsDirty}
-          onSaveRef={saveRef}
           vaultPath={vaultPath}
         />
       </div>

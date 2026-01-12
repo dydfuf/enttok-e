@@ -28,7 +28,6 @@ src/components/
 | Edit sidebar widgets | `src/components/sidebar/` |
 | Modify primitive style | `src/components/ui/<component>.tsx` |
 | Update activity feed | `src/components/activity/ActivityStream.tsx` |
-| Fix daily note header | `src/components/daily/DailyHeader.tsx` |
 | Add new UI animation | `src/lib/utils.ts` (cn) or component CSS |
 
 ## COMPONENT PATTERNS
