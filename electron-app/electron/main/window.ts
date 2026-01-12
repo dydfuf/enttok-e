@@ -1,5 +1,9 @@
 import { BrowserWindow } from "electron";
-import { getPreloadPath, getRendererIndexPath } from "../paths.js";
+import {
+  getAppIconPath,
+  getPreloadPath,
+  getRendererIndexPath,
+} from "../paths.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -11,10 +15,12 @@ export function getMainWindow(): BrowserWindow | null {
 
 export function createMainWindow(): BrowserWindow {
   const isMac = process.platform === "darwin";
+  const appIcon = getAppIconPath();
 
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: appIcon ?? undefined,
     titleBarStyle: isMac ? "hiddenInset" : undefined,
     titleBarOverlay: isMac
       ? {

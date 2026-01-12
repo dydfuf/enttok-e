@@ -14,6 +14,14 @@ export function getRendererIndexPath() {
   return path.join(__dirname, "../../dist-react/index.html");
 }
 
+export function getAppIconPath() {
+  if (app.isPackaged) {
+    return null;
+  }
+  const iconPath = path.join(__dirname, "../../public/icon.png");
+  return fs.existsSync(iconPath) ? iconPath : null;
+}
+
 export function getBackendBaseDir() {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "backend");

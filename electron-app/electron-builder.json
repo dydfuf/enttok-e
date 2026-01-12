@@ -1,6 +1,7 @@
 {
   "appId": "com.kakaoent.enttok-e",
   "productName": "Enttok-E",
+  "icon": "public/icon.png",
   "directories": {
     "output": "release",
     "buildResources": "build"
