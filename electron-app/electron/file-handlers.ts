@@ -192,6 +192,203 @@ export async function listMarkdownFiles(
   }
 }
 
+export interface NoteSearchResult {
+  id: string;
+  title: string;
+  filePath: string;
+  updatedAt: string;
+  score: number;
+  snippet?: string;
+  relativePath?: string;
+}
+
+export interface SearchNotesPayload {
+  vaultPath: string;
+  query: string;
+  limit?: number;
+}
+
+export interface SearchNotesResult {
+  success: boolean;
+  query: string;
+  results?: NoteSearchResult[];
+  error?: string;
+}
+
+const DEFAULT_SEARCH_LIMIT = 200;
+const TITLE_MATCH_WEIGHT = 5;
+const SNIPPET_PADDING_BEFORE = 60;
+const SNIPPET_PADDING_AFTER = 80;
+
+async function listMarkdownFilesRecursive(folderPath: string): Promise<string[]> {
+  const entries = await readdir(folderPath, { withFileTypes: true });
+  const results: string[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(folderPath, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await listMarkdownFilesRecursive(entryPath);
+      results.push(...nested);
+      continue;
+    }
+    if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
+      results.push(entryPath);
+    }
+  }
+
+  return results;
+}
+
+function buildSearchTokens(query: string): string[] {
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function countOccurrences(text: string, token: string): number {
+  if (!token) return 0;
+  let count = 0;
+  let index = 0;
+  while (true) {
+    index = text.indexOf(token, index);
+    if (index === -1) {
+      break;
+    }
+    count += 1;
+    index += token.length;
+  }
+  return count;
+}
+
+function buildSnippet(content: string, tokens: string[]): string | undefined {
+  if (tokens.length === 0) return undefined;
+  const lower = content.toLowerCase();
+  let matchIndex = -1;
+  let matchedToken = "";
+
+  for (const token of tokens) {
+    const index = lower.indexOf(token);
+    if (index === -1) {
+      continue;
+    }
+    if (matchIndex === -1 || index < matchIndex) {
+      matchIndex = index;
+      matchedToken = token;
+    }
+  }
+
+  if (matchIndex === -1) {
+    return undefined;
+  }
+
+  const start = Math.max(0, matchIndex - SNIPPET_PADDING_BEFORE);
+  const end = Math.min(
+    content.length,
+    matchIndex + matchedToken.length + SNIPPET_PADDING_AFTER
+  );
+  const excerpt = content.slice(start, end).replace(/\s+/g, " ").trim();
+  const prefix = start > 0 ? "..." : "";
+  const suffix = end < content.length ? "..." : "";
+  return `${prefix}${excerpt}${suffix}`;
+}
+
+export async function searchNotes(
+  payload: SearchNotesPayload
+): Promise<SearchNotesResult> {
+  const query = payload.query?.trim() ?? "";
+  if (!payload.vaultPath) {
+    return {
+      success: false,
+      query,
+      error: "Missing vault path",
+    };
+  }
+  if (!query) {
+    return { success: true, query, results: [] };
+  }
+
+  try {
+    const tokens = buildSearchTokens(query);
+    const files = await listMarkdownFilesRecursive(payload.vaultPath);
+    const results: NoteSearchResult[] = [];
+
+    for (const filePath of files) {
+      try {
+        const [fileStat, content] = await Promise.all([
+          stat(filePath),
+          fsReadFile(filePath, "utf-8"),
+        ]);
+
+        const relativePath = path
+          .relative(payload.vaultPath, filePath)
+          .replace(/\\/g, "/");
+        if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+          continue;
+        }
+        const relativeId = relativePath.replace(/\.md$/i, "");
+        const title = path.basename(relativeId);
+        const titleLower = title.toLowerCase();
+        const contentLower = content.toLowerCase();
+
+        let titleMatches = 0;
+        let contentMatches = 0;
+        for (const token of tokens) {
+          titleMatches += countOccurrences(titleLower, token);
+          contentMatches += countOccurrences(contentLower, token);
+        }
+
+        const score = titleMatches * TITLE_MATCH_WEIGHT + contentMatches;
+        if (score <= 0) {
+          continue;
+        }
+
+        results.push({
+          id: encodeURIComponent(relativeId),
+          title,
+          filePath,
+          updatedAt: fileStat.mtime.toISOString(),
+          score,
+          snippet: buildSnippet(content, tokens),
+          relativePath: relativeId,
+        });
+      } catch {
+        continue;
+      }
+    }
+
+    results.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return (
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+    });
+
+    const limit = payload.limit ?? DEFAULT_SEARCH_LIMIT;
+    const limited =
+      limit > 0 && results.length > limit ? results.slice(0, limit) : results;
+
+    return { success: true, query, results: limited };
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      return { success: true, query, results: [] };
+    }
+    return {
+      success: false,
+      query,
+      error: error instanceof Error ? error.message : "Failed to search notes",
+    };
+  }
+}
+
 export interface CreateNoteResult {
   success: boolean;
   note?: NoteInfo;

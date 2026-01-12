@@ -46,6 +46,8 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("vault:create-note", folderPath, title),
   getNotePath: (folderPath: string, noteId: string) =>
     ipcRenderer.invoke("vault:get-note-path", folderPath, noteId),
+  searchNotes: (payload: { vaultPath: string; query: string; limit?: number }) =>
+    ipcRenderer.invoke("vault:search-notes", payload),
 
   // Daily Notes API
   getDailyNotePath: (vaultPath: string, date: string) =>

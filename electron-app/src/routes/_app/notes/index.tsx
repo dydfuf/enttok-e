@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState, type ChangeEvent } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Plus, FolderOpen, RefreshCw } from "lucide-react";
 import { useNotes } from "@/hooks/useNotes";
+import { useNoteSearch } from "@/hooks/useNoteSearch";
 import { useVault } from "@/contexts/VaultContext";
 import { formatDistanceToNow } from "date-fns";
 
@@ -22,14 +23,23 @@ export const Route = createFileRoute("/_app/notes/")({
   component: NotesIndexPage,
 });
 
+const SEARCH_LIMIT = 200;
+
 function NotesIndexPage() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { selectVault } = useVault();
   const { vaultPath, notes, isLoading, error, loadNotes, createNote } =
     useNotes();
+  const {
+    results: searchResults,
+    isLoading: isSearchLoading,
+    error: searchError,
+    hasQuery,
+  } = useNoteSearch(searchQuery, { limit: SEARCH_LIMIT, debounceMs: 200 });
 
   const handleSelectVault = async () => {
     const success = await selectVault();
@@ -55,6 +65,13 @@ function NotesIndexPage() {
       toast.error("Failed to create note");
     }
   };
+
+  const handleSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(event.target.value);
+    },
+    []
+  );
 
   const formatDate = (dateStr: string) => {
     try {
@@ -154,13 +171,76 @@ function NotesIndexPage() {
           </div>
         </div>
 
-        {error && (
+        <div className="mb-4">
+          <Input
+            type="text"
+            placeholder="Search all notes..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="h-11"
+          />
+          {hasQuery && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              {isSearchLoading
+                ? "Searching notes..."
+                : `${searchResults.length} results`}
+            </div>
+          )}
+        </div>
+
+        {!hasQuery && error && (
           <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md mb-4">
             {error}
           </div>
         )}
+        {hasQuery && searchError && (
+          <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md mb-4">
+            {searchError}
+          </div>
+        )}
 
-        {isLoading && notes.length === 0 ? (
+        {hasQuery ? (
+          isSearchLoading ? (
+            <div className="text-center py-12">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin text-muted-foreground" />
+              <p className="text-muted-foreground mt-2">Searching notes...</p>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                No results found for "{searchQuery}"
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {searchResults.map((note) => (
+                <Link
+                  key={note.id}
+                  to="/notes/$noteId"
+                  params={{ noteId: note.id }}
+                  className="block p-4 bg-card border border-border rounded-lg hover:border-primary transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <h3 className="font-medium">{note.title}</h3>
+                    <p className="text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDate(note.updatedAt)}
+                    </p>
+                  </div>
+                  {note.relativePath && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {note.relativePath}
+                    </p>
+                  )}
+                  {note.snippet && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {note.snippet}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )
+        ) : isLoading && notes.length === 0 ? (
           <div className="text-center py-12">
             <RefreshCw className="w-8 h-8 mx-auto animate-spin text-muted-foreground" />
             <p className="text-muted-foreground mt-2">Loading notes...</p>

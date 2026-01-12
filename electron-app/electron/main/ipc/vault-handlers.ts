@@ -4,6 +4,7 @@ import {
   listMarkdownFiles,
   createNote,
   getNotePath,
+  searchNotes,
   getDailyNotePath,
   createDailyNote,
   listDailyNoteDates,
@@ -20,6 +21,11 @@ export function registerVaultHandlers() {
   );
   ipcMain.handle("vault:get-note-path", (_, folderPath: string, noteId: string) =>
     getNotePath(folderPath, noteId)
+  );
+  ipcMain.handle(
+    "vault:search-notes",
+    (_, payload: { vaultPath: string; query: string; limit?: number }) =>
+      searchNotes(payload)
   );
 
   // IPC Handlers for daily notes

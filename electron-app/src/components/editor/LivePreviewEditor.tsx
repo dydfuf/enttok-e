@@ -23,7 +23,14 @@ import {
   syntaxTree,
 } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
-import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+import {
+  search,
+  searchKeymap,
+  highlightSelectionMatches,
+  SearchQuery,
+  setSearchQuery,
+  findNext,
+} from "@codemirror/search";
 import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -552,6 +559,7 @@ export function LivePreviewEditor({
   const selectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onOpenNoteRef = useRef(onOpenNote);
+  const lastSearchQueryRef = useRef("");
 
   useEffect(() => {
     vaultPathRef.current = vaultPath;
@@ -568,6 +576,43 @@ export function LivePreviewEditor({
   useEffect(() => {
     onOpenNoteRef.current = onOpenNote;
   }, [onOpenNote]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const handleSearch = (event: Event) => {
+      const detail = (event as CustomEvent<{ query?: string }>).detail;
+      const nextQuery = detail?.query?.toString() ?? "";
+      const view = editorRef.current;
+      if (!view) {
+        return;
+      }
+
+      const trimmed = nextQuery.trim();
+      view.dispatch({
+        effects: setSearchQuery.of(
+          new SearchQuery({ search: trimmed, caseSensitive: false })
+        ),
+      });
+
+      if (!trimmed) {
+        lastSearchQueryRef.current = "";
+        return;
+      }
+
+      if (trimmed !== lastSearchQueryRef.current) {
+        lastSearchQueryRef.current = trimmed;
+        view.dispatch({ selection: { anchor: 0 } });
+      }
+      findNext(view);
+    };
+
+    window.addEventListener("editor:search", handleSearch);
+    return () => {
+      window.removeEventListener("editor:search", handleSearch);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -667,6 +712,7 @@ export function LivePreviewEditor({
       history(),
       bracketMatching(),
       indentOnInput(),
+      search(),
       highlightSelectionMatches(),
       markdown({
         base: markdownLanguage,

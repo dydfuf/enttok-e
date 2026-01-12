@@ -52,6 +52,29 @@ export type CreateNoteResult = {
   error?: string;
 };
 
+export type NoteSearchResult = {
+  id: string;
+  title: string;
+  filePath: string;
+  updatedAt: string;
+  score: number;
+  snippet?: string;
+  relativePath?: string;
+};
+
+export type SearchNotesResult = {
+  success: boolean;
+  query: string;
+  results?: NoteSearchResult[];
+  error?: string;
+};
+
+export type SearchNotesPayload = {
+  vaultPath: string;
+  query: string;
+  limit?: number;
+};
+
 export type DailyNoteResult = {
   success: boolean;
   filePath?: string;
@@ -305,6 +328,7 @@ export type ElectronAPI = {
   listNotes: (folderPath: string) => Promise<ListNotesResult>;
   createNote: (folderPath: string, title: string) => Promise<CreateNoteResult>;
   getNotePath: (folderPath: string, noteId: string) => Promise<string | null>;
+  searchNotes: (payload: SearchNotesPayload) => Promise<SearchNotesResult>;
   getDailyNotePath: (vaultPath: string, date: string) => Promise<string>;
   createDailyNote: (vaultPath: string, date: string) => Promise<DailyNoteResult>;
   listDailyNoteDates: (vaultPath: string) => Promise<DailyNoteDatesResult>;
