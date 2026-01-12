@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { format, formatDistanceToNow, isValid, parseISO, subHours } from "date-fns";
+import { endOfDay, format, formatDistanceToNow, isToday, isValid, parseISO, startOfDay } from "date-fns";
 import { useGitHub } from "@/contexts/GitHubContext";
 import { useClaudeSessions } from "@/contexts/ClaudeSessionsContext";
 import { useActivityEvents } from "@/hooks/useActivityEvents";
@@ -12,7 +12,6 @@ import {
 	type ActivityStreamItem,
 } from "@/lib/activity-types";
 
-const ACTIVITY_WINDOW_HOURS = 24;
 const MAX_ACTIVITY_ITEMS = 50;
 
 type ActivityEntryInput = Omit<ActivityStreamEntry, "timeLabel">;
@@ -72,7 +71,13 @@ function formatCalendarDetails(event: CalendarEvent): string {
 	return parts.join(" | ");
 }
 
-export function useActivityStream(): ActivityStreamState {
+type UseActivityStreamOptions = {
+	selectedDate?: Date;
+};
+
+export function useActivityStream(options: UseActivityStreamOptions = {}): ActivityStreamState {
+	const { selectedDate } = options;
+
 	const {
 		summary,
 		loading: gitHubLoading,
@@ -90,11 +95,20 @@ export function useActivityStream(): ActivityStreamState {
 
 	const { primaryCalendarIds } = useCalendar();
 
-	const [rangeEnd, setRangeEnd] = useState(() => new Date());
-	const rangeStart = useMemo(
-		() => subHours(rangeEnd, ACTIVITY_WINDOW_HOURS),
-		[rangeEnd],
-	);
+	const [now, setNow] = useState(() => new Date());
+
+	// Use selected date or today
+	const targetDate = selectedDate ?? now;
+
+	// Range: start of selected day to end of day (or current time if today)
+	const rangeStart = useMemo(() => startOfDay(targetDate), [targetDate]);
+	const rangeEnd = useMemo(() => {
+		if (isToday(targetDate)) {
+			return now;
+		}
+		return endOfDay(targetDate);
+	}, [targetDate, now]);
+
 	const hasRequestedSummary = useRef(false);
 
 	const {
@@ -129,7 +143,7 @@ export function useActivityStream(): ActivityStreamState {
 	}, [summary, refreshSummary]);
 
 	const refresh = useCallback(async () => {
-		setRangeEnd(new Date());
+		setNow(new Date());
 		await Promise.allSettled([
 			refreshGitHub(),
 			refreshSummary(),

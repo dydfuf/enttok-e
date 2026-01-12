@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useLocation } from "@tanstack/react-router";
+import { parseISO } from "date-fns";
 import { Activity, Bot, FileText, History, Loader2, Plus, X } from "lucide-react";
 import {
   Sidebar,
@@ -111,8 +113,19 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityContext, setActivityContext] = useState<string | null>(null);
   const { toggleSidebar } = useSidebar();
+  const location = useLocation();
+
+  // Parse selected date from URL (e.g., /daily/2024-01-12)
+  const selectedDate = useMemo(() => {
+    const match = location.pathname.match(/^\/daily\/(\d{4}-\d{2}-\d{2})$/);
+    if (match) {
+      return parseISO(match[1]);
+    }
+    return new Date(); // Default to today
+  }, [location.pathname]);
+
   const { activities, isLoading: isActivityLoading, refresh: refreshActivity } =
-    useActivityStream();
+    useActivityStream({ selectedDate });
 
   const editorContext = useEditorOptional();
   const claudeAPI = useMemo<ClaudeAPI | null>(() => getElectronAPI(), []);
