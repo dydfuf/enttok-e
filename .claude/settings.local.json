@@ -22,7 +22,10 @@
       "Bash(curl:*)",
       "Bash(sqlite3:*)",
       "Bash(python3:*)",
-      "Bash(pnpm vite build:*)"
+      "Bash(pnpm vite build:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm build:electron:*)"
     ]
   }
 }
