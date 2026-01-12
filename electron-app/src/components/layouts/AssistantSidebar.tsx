@@ -316,6 +316,37 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
     };
   }, [handleIncludeActivity]);
 
+  // Listen for activity:summarize event from EditorLayout
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        activities?: ActivityStreamItem[];
+        noteContent?: string | null;
+        prompt?: string;
+      }>).detail;
+
+      if (!detail?.prompt) return;
+
+      // Format activity context if provided
+      const activityCtx = detail.activities && detail.activities.length > 0
+        ? formatActivitiesAsContext(detail.activities)
+        : null;
+
+      // Trigger submit with the provided prompt and contexts
+      handleSubmit(
+        detail.prompt,
+        null, // no selected text
+        detail.noteContent ?? null,
+        true, // include note context
+        activityCtx
+      );
+    };
+    window.addEventListener("activity:summarize", handler);
+    return () => {
+      window.removeEventListener("activity:summarize", handler);
+    };
+  }, [handleSubmit]);
+
   const handleClearActivityContext = useCallback(() => {
     setActivityContext(null);
   }, []);

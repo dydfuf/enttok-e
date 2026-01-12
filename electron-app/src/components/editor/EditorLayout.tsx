@@ -71,6 +71,22 @@ export function EditorLayout({
     );
   }, [activities]);
 
+  const handleSummarize = useCallback(() => {
+    window.dispatchEvent(
+      new CustomEvent<{
+        activities: ActivityStreamItem[];
+        noteContent: string | null;
+        prompt: string;
+      }>("activity:summarize", {
+        detail: {
+          activities,
+          noteContent: contentRef.current,
+          prompt: "오늘 한 일 요약해줘",
+        },
+      })
+    );
+  }, [activities]);
+
   useEffect(() => {
     contentRef.current = content;
     editorContext?.setNoteContent(content);
@@ -181,6 +197,7 @@ export function EditorLayout({
         isLoading={isActivityLoading}
         onRefresh={refreshActivity}
         onIncludeInChat={handleIncludeActivity}
+        onSummarize={handleSummarize}
       />
 
       {/* Editor area - Live Preview */}

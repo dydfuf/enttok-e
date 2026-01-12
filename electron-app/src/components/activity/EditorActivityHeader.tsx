@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, ChevronDown, ChevronRight, History, RefreshCw } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, History, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -15,6 +15,7 @@ interface EditorActivityHeaderProps {
   isLoading?: boolean;
   onRefresh?: () => void;
   onIncludeInChat?: () => void;
+  onSummarize?: () => void;
 }
 
 export function EditorActivityHeader({
@@ -22,6 +23,7 @@ export function EditorActivityHeader({
   isLoading = false,
   onRefresh,
   onIncludeInChat,
+  onSummarize,
 }: EditorActivityHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -51,9 +53,23 @@ export function EditorActivityHeader({
 
         {/* Action buttons - always accessible */}
         <div className="flex gap-1.5 items-center">
-          {activities.length > 0 && onIncludeInChat && (
+          {activities.length > 0 && onSummarize && (
             <Button
               variant="secondary"
+              size="sm"
+              className="h-7 gap-1.5 text-xs px-2 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSummarize();
+              }}
+            >
+              <Sparkles className="size-3" />
+              Summarize
+            </Button>
+          )}
+          {activities.length > 0 && onIncludeInChat && (
+            <Button
+              variant="ghost"
               size="sm"
               className="h-7 gap-1.5 text-xs px-2 cursor-pointer"
               onClick={(e) => {
