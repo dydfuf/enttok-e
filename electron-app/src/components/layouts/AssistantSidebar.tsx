@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useLocation } from "@tanstack/react-router";
-import { parseISO } from "date-fns";
-import { Activity, Bot, BookOpen, ChevronDown, ChevronRight, FileText, History, Loader2, Plus, X } from "lucide-react";
+import { Activity, Bot, BookOpen, ChevronDown, ChevronRight, FileText, Loader2, Plus, X } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,9 +17,8 @@ import type {
   MemorySearchResult,
 } from "@/shared/electron-api";
 import { getElectronAPI } from "@/lib/electron";
-import { ActivityStream, getActivitySourceLabel } from "@/components/activity";
+import { getActivitySourceLabel } from "@/components/activity";
 import { useEditorOptional } from "@/contexts/EditorContext";
-import { useActivityStream } from "@/hooks/useActivityStream";
 import type { ActivityStreamItem } from "@/lib/activity-types";
 
 export type ChatRole = "user" | "assistant";
@@ -130,32 +127,16 @@ function extractOutput(job: ClaudeJobRecord): string | null {
   return null;
 }
 
-type TabType = "assistant" | "activity";
-
 type AssistantSidebarProps = {
   onResize: (width: number) => void;
 };
 
 export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("assistant");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activityContext, setActivityContext] = useState<string | null>(null);
   const { toggleSidebar } = useSidebar();
-  const location = useLocation();
-
-  // Parse selected date from URL (e.g., /daily/2024-01-12)
-  const selectedDate = useMemo(() => {
-    const match = location.pathname.match(/^\/daily\/(\d{4}-\d{2}-\d{2})$/);
-    if (match) {
-      return parseISO(match[1]);
-    }
-    return new Date(); // Default to today
-  }, [location.pathname]);
-
-  const { activities, isLoading: isActivityLoading, refresh: refreshActivity } =
-    useActivityStream({ selectedDate });
 
   const editorContext = useEditorOptional();
   const claudeAPI = useMemo<ClaudeAPI | null>(() => getElectronAPI(), []);
@@ -306,12 +287,25 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
     setMessages([]);
   }, []);
 
-  const handleIncludeActivity = useCallback(() => {
-    if (activities.length === 0) return;
-    const formatted = formatActivitiesAsContext(activities);
+  const handleIncludeActivity = useCallback((activityItems: ActivityStreamItem[]) => {
+    if (activityItems.length === 0) return;
+    const formatted = formatActivitiesAsContext(activityItems);
     setActivityContext(formatted);
-    setActiveTab("assistant");
-  }, [activities]);
+  }, []);
+
+  // Listen for activity:include event from EditorLayout
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ activities?: ActivityStreamItem[] }>).detail;
+      if (detail?.activities && detail.activities.length > 0) {
+        handleIncludeActivity(detail.activities);
+      }
+    };
+    window.addEventListener("activity:include", handler);
+    return () => {
+      window.removeEventListener("activity:include", handler);
+    };
+  }, [handleIncludeActivity]);
 
   const handleClearActivityContext = useCallback(() => {
     setActivityContext(null);
@@ -395,52 +389,22 @@ export default function AssistantSidebar({ onResize }: AssistantSidebarProps) {
   return (
     <Sidebar collapsible="icon" variant="sidebar" side="right">
       <SidebarContent className="group-data-[collapsible=icon]:hidden">
-        <div className="flex items-center gap-1 p-1 h-10 border-b border-border bg-muted/30">
-          <Button
-            variant={activeTab === "assistant" ? "secondary" : "ghost"}
-            size="sm"
-            className="flex-1 gap-2"
-            onClick={() => setActiveTab("assistant")}
-          >
-            <Bot className="size-4" />
-          </Button>
-          <Button
-            variant={activeTab === "activity" ? "secondary" : "ghost"}
-            size="sm"
-            className="flex-1 gap-2"
-            onClick={() => setActiveTab("activity")}
-          >
-            <History className="size-4" />
-          </Button>
-        </div>
-
-        {activeTab === "assistant" && (
-          <AssistantTab
-            messages={messages}
-            isSubmitting={isSubmitting}
-            sessionId={sessionId}
-            selectedText={editorContext?.selectedText ?? null}
-            noteContent={editorContext?.noteContent ?? null}
-            includeNoteContext={editorContext?.includeNoteContext ?? true}
-            activityContext={activityContext}
-            onIncludeNoteContextChange={editorContext?.setIncludeNoteContext}
-            onClearSelection={editorContext?.clearSelection}
-            onClearActivityContext={handleClearActivityContext}
-            onSubmit={handleSubmit}
-            onNewSession={handleNewSession}
-            onApply={handleApply}
-            onCopy={handleCopy}
-          />
-        )}
-
-        {activeTab === "activity" && (
-          <ActivityStream
-            activities={activities}
-            isLoading={isActivityLoading}
-            onRefresh={refreshActivity}
-            onIncludeInChat={handleIncludeActivity}
-          />
-        )}
+        <AssistantTab
+          messages={messages}
+          isSubmitting={isSubmitting}
+          sessionId={sessionId}
+          selectedText={editorContext?.selectedText ?? null}
+          noteContent={editorContext?.noteContent ?? null}
+          includeNoteContext={editorContext?.includeNoteContext ?? true}
+          activityContext={activityContext}
+          onIncludeNoteContextChange={editorContext?.setIncludeNoteContext}
+          onClearSelection={editorContext?.clearSelection}
+          onClearActivityContext={handleClearActivityContext}
+          onSubmit={handleSubmit}
+          onNewSession={handleNewSession}
+          onApply={handleApply}
+          onCopy={handleCopy}
+        />
       </SidebarContent>
       <SidebarRail
         onPointerDown={handleRailPointerDown}

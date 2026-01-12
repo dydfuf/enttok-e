@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { parseISO } from "date-fns";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { useActivityStream } from "@/hooks/useActivityStream";
 import { LivePreviewEditor, type SelectionInfo } from "./LivePreviewEditor";
 import { EditorToolbar } from "./EditorToolbar";
+import { EditorActivityHeader } from "@/components/activity";
 import { cn } from "@/lib/utils";
 import { useEditorOptional } from "@/contexts/EditorContext";
+import type { ActivityStreamItem } from "@/lib/activity-types";
 
 interface EditorLayoutProps {
   initialFilePath?: string;
@@ -25,6 +29,7 @@ export function EditorLayout({
   vaultPath,
 }: EditorLayoutProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     filePath,
     content,
@@ -41,6 +46,30 @@ export function EditorLayout({
   const contentRef = useRef(content);
   const filePathRef = useRef(filePath);
   const editorContext = useEditorOptional();
+
+  // Parse selected date from URL (e.g., /daily/2024-01-12)
+  const selectedDate = useMemo(() => {
+    const match = location.pathname.match(/^\/daily\/(\d{4}-\d{2}-\d{2})$/);
+    if (match) {
+      return parseISO(match[1]);
+    }
+    return new Date(); // Default to today
+  }, [location.pathname]);
+
+  const {
+    activities,
+    isLoading: isActivityLoading,
+    refresh: refreshActivity,
+  } = useActivityStream({ selectedDate });
+
+  const handleIncludeActivity = useCallback(() => {
+    if (activities.length === 0) return;
+    window.dispatchEvent(
+      new CustomEvent<{ activities: ActivityStreamItem[] }>("activity:include", {
+        detail: { activities },
+      })
+    );
+  }, [activities]);
 
   useEffect(() => {
     contentRef.current = content;
@@ -145,6 +174,14 @@ export function EditorLayout({
           {error}
         </div>
       )}
+
+      {/* Activity Stream - collapsible header */}
+      <EditorActivityHeader
+        activities={activities}
+        isLoading={isActivityLoading}
+        onRefresh={refreshActivity}
+        onIncludeInChat={handleIncludeActivity}
+      />
 
       {/* Editor area - Live Preview */}
       <div className="flex-1 overflow-hidden">
